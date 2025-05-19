@@ -29,6 +29,12 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+// Usuário de exemplo para login rápido
+const DEMO_USER = {
+  email: "demo@example.com",
+  phone: "11999999999"
+};
+
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,24 +48,33 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  // Mock login function - in a real app, this would make an API request
   const login = async (email: string, phone: string): Promise<boolean> => {
     try {
+      console.log("Login attempt with:", { email, phone });
+      
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // TODO: In a real app, this would validate credentials against a backend
-      if (!email || !phone) return false;
+      // Aceita login com credenciais de exemplo ou verifica as credenciais
+      const isValidCredentials = 
+        (email === DEMO_USER.email && phone === DEMO_USER.phone) ||
+        (email && phone);  // Mantém a validação simples para qualquer email/telefone
       
-      // Simple validation for demo
-      const user = {
+      if (!isValidCredentials) {
+        console.log("Login failed: Invalid credentials");
+        return false;
+      }
+      
+      // Login bem-sucedido
+      const newUser = {
         id: "user123",
         email,
         phone
       };
       
-      setUser(user);
-      localStorage.setItem("user", JSON.stringify(user));
+      console.log("Login successful, setting user:", newUser);
+      setUser(newUser);
+      localStorage.setItem("user", JSON.stringify(newUser));
       return true;
     } catch (error) {
       console.error("Login error:", error);
@@ -68,20 +83,27 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    console.log("Logging out user");
     setUser(null);
     localStorage.removeItem("user");
   };
 
+  const authContextValue = {
+    user,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    isLoading
+  };
+
+  console.log("Auth context current state:", {
+    isAuthenticated: !!user,
+    isLoading,
+    hasUser: !!user
+  });
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        isLoading
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

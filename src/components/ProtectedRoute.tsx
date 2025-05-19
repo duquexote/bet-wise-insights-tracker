@@ -1,9 +1,18 @@
 
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  // For debugging
+  useEffect(() => {
+    console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
+    console.log("ProtectedRoute - isLoading:", isLoading);
+    console.log("ProtectedRoute - current location:", location.pathname);
+  }, [isAuthenticated, isLoading, location]);
 
   // Show a loading state while checking authentication
   if (isLoading) {
@@ -14,6 +23,7 @@ const ProtectedRoute = () => {
     );
   }
 
+  // Redirect to login if not authenticated, or continue to the requested page if authenticated
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
