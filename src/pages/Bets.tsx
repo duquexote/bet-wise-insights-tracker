@@ -1,8 +1,26 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -25,74 +43,403 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { mockDataService, Bet } from "@/services/mockData";
+import supabaseService, { Bet } from "@/services/supabaseService";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import { Search, CheckCircle, XCircle, Clock, Filter, Download } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Filter, Download, Edit, Plus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
-const BetsTable = ({ bets }: { bets: Bet[] }) => {
+// Schema de validação para o formulário de apostas
+const betFormSchema = z.object({
+  partida: z.string().min(3, { message: "A partida deve ter pelo menos 3 caracteres" }),
+  market: z.string().min(2, { message: "O mercado deve ter pelo menos 2 caracteres" }),
+  odd: z.coerce.number().min(1.01, { message: "A odd deve ser maior que 1.01" }),
+  stake_valor: z.coerce.number().min(1, { message: "A stake deve ser maior que 1" }),
+  resultado: z.enum(["GREEN", "RED", "PENDING"]),
+  aposta_data: z.date({ required_error: "A data da aposta é obrigatória" }),
+  lucro_perda: z.coerce.number().optional(),
+});
+
+type BetFormValues = z.infer<typeof betFormSchema>;
+
+const BetFormDialog = ({ 
+  open, 
+  setOpen, 
+  onSubmit, 
+  defaultValues,
+  title,
+  buttonText,
+  betId
+}: { 
+  open: boolean, 
+  setOpen: (open: boolean) => void, 
+  onSubmit: (values: BetFormValues) => void, 
+  defaultValues?: Partial<BetFormValues>,
+  title: string,
+  buttonText: string,
+  betId?: string
+}) => {
+  const form = useForm<BetFormValues>({
+    resolver: zodResolver(betFormSchema),
+    defaultValues: defaultValues || {
+      partida: "",
+      market: "",
+      odd: 1.5,
+      stake_valor: 10,
+      resultado: "PENDING",
+      aposta_data: new Date(),
+      lucro_perda: 0,
+    },
+  });
+  
+  // Atualizar o formulário quando os valores padrão mudarem
+  useEffect(() => {
+    if (defaultValues) {
+      Object.entries(defaultValues).forEach(([key, value]) => {
+        form.setValue(key as any, value);
+      });
+    }
+  }, [form, defaultValues]);
+
+  // Calcular lucro/prejuízo com base na odd, stake e resultado
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (["odd", "stake_valor", "resultado"].includes(name || "")) {
+        const odd = form.getValues("odd");
+        const stake = form.getValues("stake_valor");
+        const resultado = form.getValues("resultado");
+        
+        let lucroPerda = 0;
+        if (resultado === "GREEN") {
+          lucroPerda = stake * odd - stake;
+        } else if (resultado === "RED") {
+          lucroPerda = -stake;
+        }
+        
+        form.setValue("lucro_perda", lucroPerda);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead>Partida</TableHead>
-            <TableHead>Mercado</TableHead>
-            <TableHead>Seleção</TableHead>
-            <TableHead>Odd</TableHead>
-            <TableHead>Stake</TableHead>
-            <TableHead>Resultado</TableHead>
-            <TableHead className="text-right">Lucro/Prejuízo</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {bets.length > 0 ? (
-            bets.map((bet) => (
-              <TableRow key={bet.id}>
-                <TableCell>{formatDate(bet.createdAt)}</TableCell>
-                <TableCell>{bet.match}</TableCell>
-                <TableCell>{bet.market}</TableCell>
-                <TableCell>{bet.selection}</TableCell>
-                <TableCell>{bet.odds}</TableCell>
-                <TableCell>{formatCurrency(bet.stake)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <div className={`h-2 w-2 rounded-full mr-2 ${
-                      bet.result === 'win' ? 'bg-betGreen' : 
-                      bet.result === 'loss' ? 'bg-betRed' : 
-                      'bg-betGray'
-                    }`}></div>
-                    <span>
-                      {bet.result === 'win' ? 'Ganho' : 
-                       bet.result === 'loss' ? 'Perda' : 
-                       'Pendente'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className={`text-right ${
-                  bet.result === 'win' ? 'text-betGreen font-medium' : 
-                  bet.result === 'loss' ? 'text-betRed font-medium' : 
-                  ''
-                }`}>
-                  {bet.result === 'win' ? '+' : bet.result === 'loss' ? '-' : ''}
-                  {formatCurrency(Math.abs(bet.profit))}
-                </TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center">
-                Nenhuma aposta encontrada.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Preencha os dados da aposta abaixo.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="aposta_data"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data da Aposta</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "dd/MM/yyyy")
+                            ) : (
+                              <span>Selecione uma data</span>
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="resultado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Resultado</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o resultado" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="GREEN">Vitória</SelectItem>
+                        <SelectItem value="RED">Derrota</SelectItem>
+                        <SelectItem value="PENDING">Pendente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="partida"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Partida</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Flamengo x Corinthians" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="market"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mercado</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Resultado Final" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="odd"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Odd</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="stake_valor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stake (R$)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="lucro_perda"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lucro/Prejuízo (R$)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      {...field} 
+                      disabled 
+                      className="bg-gray-100"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Calculado automaticamente com base nos valores acima
+                    {betId && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        ID da aposta: {betId}
+                      </div>
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <DialogFooter>
+              <Button type="submit">{buttonText}</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-const BetsEmptyState = () => {
+// Modal de confirmação para exclusão de apostas
+const DeleteConfirmationDialog = ({
+  open,
+  setOpen,
+  onConfirm,
+  betId
+}: {
+  open: boolean,
+  setOpen: (open: boolean) => void,
+  onConfirm: () => void,
+  betId: string
+}) => {
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Confirmar Exclusão</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja excluir esta aposta? Esta ação não pode ser desfeita.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-sm text-muted-foreground">
+            ID da aposta: {betId}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="destructive" onClick={() => {
+            onConfirm();
+            setOpen(false);
+          }}>Excluir</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const BetsTable = ({ bets, onEdit, onDelete }: { bets: Bet[], onEdit: (bet: Bet) => void, onDelete: (id: string) => void }) => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [betToDelete, setBetToDelete] = useState<string | null>(null);
+
+  const handleDeleteClick = (id: string) => {
+    setBetToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (betToDelete) {
+      onDelete(betToDelete);
+      setBetToDelete(null);
+    }
+  };
+  
+  return (
+    <>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data</TableHead>
+              <TableHead>Partida</TableHead>
+              <TableHead>Mercado</TableHead>
+              <TableHead>Odd</TableHead>
+              <TableHead>Stake</TableHead>
+              <TableHead>Resultado</TableHead>
+              <TableHead>Lucro/Prejuízo</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bets.length > 0 ? (
+              bets.map((bet) => (
+                <TableRow key={bet.id}>
+                  <TableCell>{formatDate(bet.aposta_data || '')}</TableCell>
+                  <TableCell>{bet.partida}</TableCell>
+                  <TableCell>{bet.market}</TableCell>
+                  <TableCell>{bet.odd}</TableCell>
+                  <TableCell>{formatCurrency(bet.stake_valor || 0)}</TableCell>
+                  <TableCell>
+                    {bet.resultado === 'GREEN' ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : bet.resultado === 'RED' ? (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <Clock className="h-5 w-5 text-yellow-500" />
+                    )}
+                  </TableCell>
+                  <TableCell>{formatCurrency(bet.lucro_perda || 0)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => onEdit(bet)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleDeleteClick(bet.id)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2">
+                          <path d="M3 6h18"/>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          <line x1="10" x2="10" y1="11" y2="17"/>
+                          <line x1="14" x2="14" y1="11" y2="17"/>
+                        </svg>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  Nenhuma aposta encontrada.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Modal de confirmação de exclusão */}
+      {betToDelete && (
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          setOpen={setDeleteDialogOpen}
+          onConfirm={handleConfirmDelete}
+          betId={betToDelete}
+        />
+      )}
+    </>
+  );
+};
+
+const BetsEmptyState = ({ onAddBet }: { onAddBet: () => void }) => {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
@@ -102,20 +449,20 @@ const BetsEmptyState = () => {
       <p className="text-gray-500 mb-6 max-w-md">
         Nenhuma aposta corresponde aos seus filtros atuais. Tente ajustar seus filtros ou registre novas apostas.
       </p>
-      <Button variant="outline">Registrar Nova Aposta</Button>
+      <Button variant="outline" onClick={onAddBet}>Registrar Nova Aposta</Button>
     </div>
   );
 };
 
 const BetsSummary = ({ bets }: { bets: Bet[] }) => {
   // Calculate summary data
-  const completedBets = bets.filter(bet => bet.result !== 'pending');
-  const wins = completedBets.filter(bet => bet.result === 'win').length;
-  const losses = completedBets.filter(bet => bet.result === 'loss').length;
-  const pending = bets.filter(bet => bet.result === 'pending').length;
+  const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+  const wins = completedBets.filter(bet => bet.resultado === 'GREEN').length;
+  const losses = completedBets.filter(bet => bet.resultado === 'RED').length;
+  const pending = bets.filter(bet => bet.resultado === 'PENDING').length;
   
-  const totalStake = bets.reduce((sum, bet) => sum + bet.stake, 0);
-  const totalProfit = completedBets.reduce((sum, bet) => sum + bet.profit, 0);
+  const totalStake = bets.reduce((sum, bet) => sum + (bet.stake_valor || 0), 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + (bet.lucro_perda || 0), 0);
   
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -171,30 +518,38 @@ const Bets = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResult, setSelectedResult] = useState('all');
-  const [selectedSport, setSelectedSport] = useState('all');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingBet, setEditingBet] = useState<Bet | null>(null);
+
   const { toast } = useToast();
 
-  // Fetch bets data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const betsData = await mockDataService.getBets();
-        setBets(betsData);
-        setFilteredBets(betsData);
-      } catch (error) {
-        console.error('Error fetching bets:', error);
-        toast({
-          title: "Erro ao carregar apostas",
-          description: "Não foi possível carregar a lista de apostas.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { user, isAuthenticated } = useAuth();
 
-    fetchData();
-  }, [toast]);
+  // Fetch bets data
+  const fetchBets = async () => {
+    try {
+      if (!isAuthenticated || !user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const betsData = await supabaseService.getBets(user.id);
+      setBets(betsData);
+      setFilteredBets(betsData);
+    } catch (error) {
+      console.error('Error fetching bets:', error);
+      toast({
+        title: "Erro ao carregar apostas",
+        description: "Não foi possível carregar a lista de apostas.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBets();
+  }, [toast, user, isAuthenticated]);
 
   // Apply filters
   useEffect(() => {
@@ -202,30 +557,135 @@ const Bets = () => {
     
     // Apply result filter
     if (selectedResult !== 'all') {
-      filtered = filtered.filter(bet => bet.result === selectedResult);
-    }
-    
-    // Apply sport filter
-    if (selectedSport !== 'all') {
-      filtered = filtered.filter(bet => bet.sport === selectedSport);
+      const resultMap = {
+        'win': 'GREEN',
+        'loss': 'RED',
+        'pending': 'PENDING'
+      };
+      filtered = filtered.filter(bet => bet.resultado === resultMap[selectedResult]);
     }
     
     // Apply search term
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(bet => 
-        bet.match.toLowerCase().includes(term) ||
-        bet.market.toLowerCase().includes(term) ||
-        bet.selection.toLowerCase().includes(term) ||
-        bet.league.toLowerCase().includes(term)
+        bet.partida.toLowerCase().includes(term) ||
+        bet.market.toLowerCase().includes(term)
       );
     }
     
     setFilteredBets(filtered);
-  }, [bets, searchTerm, selectedResult, selectedSport]);
+  }, [bets, searchTerm, selectedResult]);
 
-  // Extract unique sports for filter
-  const sports = ['all', ...new Set(bets.map(bet => bet.sport))];
+  // Handle adding a new bet
+  const handleAddBet = () => {
+    setEditingBet(null);
+    setIsFormOpen(true);
+  };
+
+  // Handle editing a bet
+  const handleEditBet = (bet: Bet) => {
+    setEditingBet(bet);
+    setIsFormOpen(true);
+  };
+
+  // Handle deleting a bet
+  const handleDeleteBet = async (id: string) => {
+    try {
+      console.log('Tentando excluir aposta com ID:', id);
+      
+      if (!user || !isAuthenticated) {
+        console.error('Usuário não autenticado');
+        toast({
+          title: "Erro de autenticação",
+          description: "Você precisa estar autenticado para excluir apostas.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Passar o ID do usuário junto com o ID da aposta para garantir a autenticação
+      const result = await supabaseService.deleteBet(id, user.id);
+      
+      if (result) {
+        console.log('Aposta excluída com sucesso no Supabase');
+        toast({
+          title: "Aposta excluída",
+          description: "A aposta foi excluída com sucesso.",
+        });
+        
+        // Atualizar a lista de apostas após a exclusão
+        await fetchBets();
+      } else {
+        console.error('Falha ao excluir aposta no Supabase');
+        toast({
+          title: "Erro ao excluir aposta",
+          description: "O servidor retornou um erro ao tentar excluir a aposta.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao excluir aposta:', error);
+      toast({
+        title: "Erro ao excluir aposta",
+        description: "Ocorreu um erro ao tentar excluir a aposta.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle form submission
+  const handleFormSubmit = async (values: z.infer<typeof betFormSchema>) => {
+    try {
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Converter a data para string no formato ISO
+      const formattedValues = {
+        ...values,
+        aposta_data: values.aposta_data.toISOString()
+      };
+
+      if (editingBet) {
+        // Update existing bet
+        await supabaseService.updateBet(editingBet.id, formattedValues);
+        toast({
+          title: "Aposta atualizada",
+          description: "A aposta foi atualizada com sucesso.",
+        });
+      } else {
+        // Create new bet
+        await supabaseService.createBet({
+          ...formattedValues,
+          user_id: user.id,
+          partida: formattedValues.partida, // Garantir que campos obrigatórios estejam presentes
+          market: formattedValues.market,
+          resultado: formattedValues.resultado,
+          odd: formattedValues.odd,
+          stake_valor: formattedValues.stake_valor,
+          lucro_perda: formattedValues.lucro_perda
+        });
+        toast({
+          title: "Aposta registrada",
+          description: "A aposta foi registrada com sucesso.",
+        });
+      }
+
+      // Refresh bets list
+      await fetchBets();
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error saving bet:', error);
+      toast({
+        title: "Erro ao salvar aposta",
+        description: "Não foi possível salvar a aposta.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Não é necessário declarar o form aqui, pois ele é gerenciado pelo BetFormDialog
 
   if (loading) {
     return (
@@ -237,10 +697,34 @@ const Bets = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Minhas Apostas</h2>
-        <p className="text-gray-500">Visualize e analise todas as suas apostas.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold mb-2">Minhas Apostas</h2>
+          <p className="text-gray-500">Visualize e analise todas as suas apostas.</p>
+        </div>
+        <Button onClick={handleAddBet} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" /> Nova Aposta
+        </Button>
       </div>
+      
+      {/* Form Dialog */}
+      <BetFormDialog
+        open={isFormOpen}
+        setOpen={setIsFormOpen}
+        onSubmit={handleFormSubmit}
+        defaultValues={editingBet ? {
+          partida: editingBet.partida,
+          market: editingBet.market,
+          odd: editingBet.odd,
+          stake_valor: editingBet.stake_valor,
+          resultado: editingBet.resultado,
+          aposta_data: editingBet.aposta_data ? new Date(editingBet.aposta_data) : new Date(),
+          lucro_perda: editingBet.lucro_perda,
+        } : undefined}
+        title={editingBet ? "Editar Aposta" : "Nova Aposta"}
+        buttonText={editingBet ? "Atualizar" : "Registrar"}
+        betId={editingBet?.id}
+      />
       
       {/* Filters */}
       <Card>
@@ -259,70 +743,57 @@ const Bets = () => {
               <div className="w-40">
                 <Select value={selectedResult} onValueChange={setSelectedResult}>
                   <SelectTrigger>
-                    <div className="flex items-center">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Resultado" />
-                    </div>
+                    <SelectValue placeholder="Resultado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="win">Ganhos</SelectItem>
                     <SelectItem value="loss">Perdas</SelectItem>
                     <SelectItem value="pending">Pendentes</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-40">
-                <Select value={selectedSport} onValueChange={setSelectedSport}>
-                  <SelectTrigger>
-                    <div className="flex items-center">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Esporte" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sports.map((sport) => (
-                      <SelectItem key={sport} value={sport}>
-                        {sport === 'all' ? 'Todos' : sport}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button variant="outline" className="flex items-center">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
+              <Button variant="outline" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon">
+                <Download className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* Summary cards */}
+      {/* Summary */}
       <BetsSummary bets={filteredBets} />
       
-      {/* Tabs with table */}
+      {/* Tabs */}
       <Tabs defaultValue="all">
-        <TabsList className="mb-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="web">Web</TabsTrigger>
+          <TabsTrigger value="win">Ganhos</TabsTrigger>
+          <TabsTrigger value="loss">Perdas</TabsTrigger>
         </TabsList>
-        
         <TabsContent value="all">
-          {filteredBets.length > 0 ? <BetsTable bets={filteredBets} /> : <BetsEmptyState />}
+          {filteredBets.length > 0 ? (
+            <BetsTable bets={filteredBets} onEdit={handleEditBet} onDelete={handleDeleteBet} />
+          ) : (
+            <BetsEmptyState onAddBet={handleAddBet} />
+          )}
         </TabsContent>
-        <TabsContent value="whatsapp">
-          {filteredBets.filter(bet => bet.source === 'whatsapp').length > 0 ? 
-            <BetsTable bets={filteredBets.filter(bet => bet.source === 'whatsapp')} /> : 
-            <BetsEmptyState />
-          }
+        <TabsContent value="win">
+          {filteredBets.filter(bet => bet.resultado === 'GREEN').length > 0 ? (
+            <BetsTable bets={filteredBets.filter(bet => bet.resultado === 'GREEN')} onEdit={handleEditBet} onDelete={handleDeleteBet} />
+          ) : (
+            <BetsEmptyState onAddBet={handleAddBet} />
+          )}
         </TabsContent>
-        <TabsContent value="web">
-          {filteredBets.filter(bet => bet.source === 'web').length > 0 ? 
-            <BetsTable bets={filteredBets.filter(bet => bet.source === 'web')} /> : 
-            <BetsEmptyState />
-          }
+        <TabsContent value="loss">
+          {filteredBets.filter(bet => bet.resultado === 'RED').length > 0 ? (
+            <BetsTable bets={filteredBets.filter(bet => bet.resultado === 'RED')} onEdit={handleEditBet} onDelete={handleDeleteBet} />
+          ) : (
+            <BetsEmptyState onAddBet={handleAddBet} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { mockDataService, Bet } from "@/services/mockData";
+import supabaseService, { Bet } from "@/services/supabaseService";
 import { formatCurrency, formatPercentage } from "@/utils/formatters";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   BarChart,
   Bar,
@@ -33,16 +34,16 @@ import {
 const PerformanceByMarketCard = ({ bets }: { bets: Bet[] }) => {
   // Group by market
   const marketPerformance = bets.reduce<Record<string, { wins: number; losses: number; profit: number; count: number; winRate: number }>>((acc, bet) => {
-    if (bet.result === 'pending') return acc;
+    if (bet.resultado === 'PENDING') return acc;
     
     if (!acc[bet.market]) {
       acc[bet.market] = { wins: 0, losses: 0, profit: 0, count: 0, winRate: 0 };
     }
     
     acc[bet.market].count++;
-    acc[bet.market].profit += bet.profit;
+    acc[bet.market].profit += bet.lucro_perda;
     
-    if (bet.result === 'win') {
+    if (bet.resultado === 'GREEN') {
       acc[bet.market].wins++;
     } else {
       acc[bet.market].losses++;
@@ -53,7 +54,7 @@ const PerformanceByMarketCard = ({ bets }: { bets: Bet[] }) => {
     return acc;
   }, {});
   
-  // Convert to array and sort by profit
+  // Convert to array and sort by number of bets (count)
   const data = Object.entries(marketPerformance)
     .map(([market, stats]) => ({
       market,
@@ -61,8 +62,8 @@ const PerformanceByMarketCard = ({ bets }: { bets: Bet[] }) => {
       winRate: stats.winRate,
       count: stats.count,
     }))
-    .sort((a, b) => b.profit - a.profit)
-    .slice(0, 6); // Get top 6
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5); // Get top 5 most bet markets
   
   return (
     <Card>
@@ -135,17 +136,17 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   };
   
   bets.forEach(bet => {
-    if (bet.result === 'pending') return;
+    if (bet.resultado === 'PENDING') return;
     
     let range = '';
-    if (bet.odds <= 1.5) range = '1.01-1.50';
-    else if (bet.odds <= 2.0) range = '1.51-2.00';
-    else if (bet.odds <= 2.5) range = '2.01-2.50';
-    else if (bet.odds <= 3.0) range = '2.51-3.00';
+    if (bet.odd <= 1.5) range = '1.01-1.50';
+    else if (bet.odd <= 2.0) range = '1.51-2.00';
+    else if (bet.odd <= 2.5) range = '2.01-2.50';
+    else if (bet.odd <= 3.0) range = '2.51-3.00';
     else range = '3.01+';
     
     oddsRanges[range].count++;
-    if (bet.result === 'win') {
+    if (bet.resultado === 'GREEN') {
       oddsRanges[range].wins++;
     }
   });
@@ -220,43 +221,58 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   );
 };
 
-const SportAnalysisCard = ({ bets }: { bets: Bet[] }) => {
-  // Group by sport
-  const sportPerformance = bets.reduce<Record<string, { count: number; profit: number; }>>((acc, bet) => {
-    if (bet.result === 'pending') return acc;
-    
-    if (!acc[bet.sport]) {
-      acc[bet.sport] = { count: 0, profit: 0 };
-    }
-    
-    acc[bet.sport].count++;
-    acc[bet.sport].profit += bet.profit;
-    
-    return acc;
-  }, {});
+const MarketAnalysisCard = ({ bets }: { bets: Bet[] }) => {
+  const [selectedMarket, setSelectedMarket] = useState<string>('todos');
   
-  // Convert to array for chart
-  const data = Object.entries(sportPerformance)
-    .map(([sport, stats]) => ({
-      sport,
-      profit: stats.profit,
-      value: stats.count,
-    }))
-    .filter(item => item.value > 0);
+  // Get all unique markets
+  const allMarkets = ['todos', ...Array.from(new Set(bets.map(bet => bet.market)))];
   
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28DFF', '#FF6B6B', '#4ECDC4'];
+  // Filter bets by selected market
+  const filteredBets = selectedMarket === 'todos' 
+    ? bets 
+    : bets.filter(bet => bet.market === selectedMarket);
+  
+  // Calculate wins, losses and profits
+  const wins = filteredBets.filter(bet => bet.resultado === 'GREEN').length;
+  const losses = filteredBets.filter(bet => bet.resultado === 'RED').length;
+  const winProfit = filteredBets
+    .filter(bet => bet.resultado === 'GREEN')
+    .reduce((sum, bet) => sum + bet.lucro_perda, 0);
+  const lossAmount = Math.abs(filteredBets
+    .filter(bet => bet.resultado === 'RED')
+    .reduce((sum, bet) => sum + bet.lucro_perda, 0));
+  
+  // Prepare data for pie chart
+  const pieData = [
+    { name: 'Vitórias', value: wins, profit: winProfit, color: '#22c55e' },
+    { name: 'Derrotas', value: losses, profit: -lossAmount, color: '#ef4444' }
+  ].filter(item => item.value > 0);
   
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Apostas por Esporte</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Apostas por Mercado</CardTitle>
+        <div className="w-48">
+          <Select value={selectedMarket} onValueChange={setSelectedMarket}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecionar Mercado" />
+            </SelectTrigger>
+            <SelectContent>
+              {allMarkets.map((market) => (
+                <SelectItem key={market} value={market}>
+                  {market === 'todos' ? 'Todos os Mercados' : market}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[350px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={data}
+                data={pieData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -265,15 +281,16 @@ const SportAnalysisCard = ({ bets }: { bets: Bet[] }) => {
                 dataKey="value"
                 label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value, name, props) => [
-                  `${value} apostas (${formatCurrency(props.payload.profit)})`, 
-                  props.payload.sport
-                ]}
+                formatter={(value, name, props) => {
+                  const profit = props.payload.profit;
+                  const formattedProfit = profit < 0 ? formatCurrency(profit) : formatCurrency(profit);
+                  return [`${value} apostas (${formattedProfit})`, props.payload.name];
+                }}
               />
               <Legend verticalAlign="bottom" />
             </PieChart>
@@ -294,17 +311,17 @@ const StakeAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   };
   
   bets.forEach(bet => {
-    if (bet.result === 'pending') return;
+    if (bet.resultado === 'PENDING') return;
     
     let range = '';
-    if (bet.stake <= 25) range = '0-25';
-    else if (bet.stake <= 50) range = '26-50';
-    else if (bet.stake <= 100) range = '51-100';
+    if (bet.stake_valor <= 25) range = '0-25';
+    else if (bet.stake_valor <= 50) range = '26-50';
+    else if (bet.stake_valor <= 100) range = '51-100';
     else range = '101+';
     
     stakeRanges[range].count++;
-    stakeRanges[range].profit += bet.profit;
-    stakeRanges[range].totalStake += bet.stake;
+    stakeRanges[range].profit += bet.lucro_perda;
+    stakeRanges[range].totalStake += bet.stake_valor;
   });
   
   // Calculate ROI
@@ -384,11 +401,16 @@ const Analysis = () => {
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('all');
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
   
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const betsData = await mockDataService.getBets();
+        if (!isAuthenticated || !user) {
+          throw new Error('Usuário não autenticado');
+        }
+        
+        const betsData = await supabaseService.getBets(user.id);
         setBets(betsData);
       } catch (error) {
         console.error('Error fetching bets data:', error);
@@ -403,13 +425,13 @@ const Analysis = () => {
     };
 
     fetchData();
-  }, [toast]);
+  }, [toast, user, isAuthenticated]);
 
   // Filter bets based on selected timeframe
   const filteredBets = bets.filter(bet => {
     if (timeframe === 'all') return true;
     
-    const betDate = new Date(bet.createdAt);
+    const betDate = new Date(bet.aposta_data || bet.created_at || '');
     const now = new Date();
     
     switch (timeframe) {
@@ -431,10 +453,10 @@ const Analysis = () => {
   });
 
   // Overall stats for the selected period
-  const completedBets = filteredBets.filter(bet => bet.result !== 'pending');
-  const totalStake = completedBets.reduce((sum, bet) => sum + bet.stake, 0);
-  const totalProfit = completedBets.reduce((sum, bet) => sum + bet.profit, 0);
-  const winningBets = completedBets.filter(bet => bet.result === 'win').length;
+  const completedBets = filteredBets.filter(bet => bet.resultado !== 'PENDING');
+  const totalStake = completedBets.reduce((sum, bet) => sum + (bet.stake_valor || 0), 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + (bet.lucro_perda || 0), 0);
+  const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN').length;
   const winRate = completedBets.length > 0 ? (winningBets / completedBets.length) * 100 : 0;
   const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
 
@@ -512,7 +534,7 @@ const Analysis = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PerformanceByMarketCard bets={filteredBets} />
         <OddsAnalysisCard bets={filteredBets} />
-        <SportAnalysisCard bets={filteredBets} />
+        <MarketAnalysisCard bets={filteredBets} />
         <StakeAnalysisCard bets={filteredBets} />
       </div>
     </div>

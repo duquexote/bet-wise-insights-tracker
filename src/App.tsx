@@ -11,6 +11,7 @@ import Analysis from "./pages/Analysis";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ChangePassword from "./pages/ChangePassword";
 import Layout from "./components/Layout";
 import AuthProvider from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/bets" element={<Bets />} />
                 <Route path="/analysis" element={<Analysis />} />
+                <Route path="/change-password" element={<ChangePassword />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

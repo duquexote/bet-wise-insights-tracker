@@ -13,6 +13,15 @@ export interface Bet {
   result: 'win' | 'loss' | 'pending';
   profit: number;
   source: 'whatsapp' | 'web';
+  user_id: string;
+  // Campos compatíveis com o Supabase
+  created_at?: string;
+  partida?: string;
+  resultado?: string;
+  lucro_perda?: number;
+  odd?: number;
+  stake_valor?: number;
+  aposta_data?: string;
 }
 
 export interface DashboardStats {
@@ -70,19 +79,32 @@ const generateMockBets = (count: number): Bet[] => {
     const selections = ['Casa', 'Fora', 'Empate', 'Over 2.5', 'Under 2.5', 'Sim', 'Não'];
     const selection = selections[Math.floor(Math.random() * selections.length)];
     
+    const matchName = `Time A vs Time B`;
+    const marketName = markets[Math.floor(Math.random() * markets.length)];
+    const selectionName = `Seleção ${i}`;
+    
     bets.push({
-      id: `bet-${i + 1}`,
+      id: `bet-${i}`,
       createdAt: date.toISOString(),
-      sport,
-      league,
-      match,
-      market,
-      selection,
+      sport: sports[Math.floor(Math.random() * sports.length)],
+      league: leagues[Math.floor(Math.random() * leagues.length)],
+      match: matchName,
+      market: marketName,
+      selection: selectionName,
       odds,
       stake,
       result,
       profit,
-      source: Math.random() > 0.7 ? 'web' : 'whatsapp'
+      source: Math.random() > 0.7 ? 'whatsapp' : 'web',
+      user_id: '0e46be09-9617-4fe6-b8fc-1f5dc2bf7c42',
+      // Campos compatíveis com o Supabase
+      created_at: date.toISOString(),
+      partida: matchName,
+      resultado: result === 'win' ? 'GREEN' : result === 'loss' ? 'RED' : 'PENDING',
+      lucro_perda: profit,
+      odd: odds,
+      stake_valor: stake,
+      aposta_data: date.toISOString()
     });
   }
   

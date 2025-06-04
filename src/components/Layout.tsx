@@ -12,6 +12,7 @@ import {
   Settings,
   User,
   X,
+  Lock,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean; toggleSidebar: () => void }) => {
@@ -28,6 +29,7 @@ const Sidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean; toggleSidebar: ()
     { path: "/dashboard", label: "Dashboard", icon: <Home className="mr-2 h-5 w-5" /> },
     { path: "/bets", label: "Minhas Apostas", icon: <FileText className="mr-2 h-5 w-5" /> },
     { path: "/analysis", label: "Análise", icon: <BarChart className="mr-2 h-5 w-5" /> },
+    { path: "/change-password", label: "Alterar Senha", icon: <Lock className="mr-2 h-5 w-5" /> },
   ];
 
   return (
@@ -79,10 +81,18 @@ const Sidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean; toggleSidebar: ()
               <p className="text-xs text-gray-500 truncate">{user?.phone}</p>
             </div>
           </div>
-          <Button variant="outline" className="w-full justify-start" onClick={handleLogout}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Sair</span>
-          </Button>
+          <div className="space-y-2">
+            <Link to="/change-password">
+              <Button variant="outline" className="w-full justify-start">
+                <Lock className="mr-2 h-4 w-4" />
+                <span>Alterar Senha</span>
+              </Button>
+            </Link>
+            <Button variant="outline" className="w-full justify-start" onClick={handleLogout}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Sair</span>
+            </Button>
+          </div>
         </div>
       </div>
     </aside>

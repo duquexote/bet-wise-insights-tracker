@@ -1,8 +1,10 @@
-# Welcome to your Lovable project
+# Betilha - Gerenciador de Apostas Esportivas
 
-## Project info
+## Sobre o Projeto
 
-**URL**: https://lovable.dev/projects/db0437c1-b218-4955-9f90-7268f84b761a
+Betilha é uma plataforma para gerenciar e acompanhar apostas esportivas de forma inteligente, oferecendo análises e insights para melhorar seus resultados.
+
+**URL do Projeto Original**: https://lovable.dev/projects/db0437c1-b218-4955-9f90-7268f84b761a
 
 ## How can I edit this code?
 
@@ -49,6 +51,20 @@ npm run dev
 - Select the "Codespaces" tab.
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
+
+## Implantação na Vercel
+
+Este projeto está configurado para ser facilmente implantado na Vercel. Siga estas etapas:
+
+1. Crie uma conta na [Vercel](https://vercel.com) se ainda não tiver uma
+2. Conecte sua conta GitHub à Vercel
+3. Importe este repositório como um novo projeto
+4. Configure as seguintes variáveis de ambiente na Vercel:
+   - `VITE_SUPABASE_URL`: URL do seu projeto Supabase
+   - `VITE_SUPABASE_ANON_KEY`: Chave anônima do seu projeto Supabase
+5. Clique em "Deploy"
+
+O arquivo `vercel.json` já está configurado para garantir que o roteamento do React funcione corretamente na Vercel.
 
 ## What technologies are used for this project?
 

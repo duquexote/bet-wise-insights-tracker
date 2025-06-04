@@ -1,14 +1,14 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { mockDataService, DashboardStats, Bet, ChartData } from "@/services/mockData";
+import supabaseService, { DashboardStats, Bet, ChartData } from "@/services/supabaseService";
 import { formatCurrency, formatPercentage, formatDate } from "@/utils/formatters";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { useAuth } from "@/contexts/AuthContext";
 
 // Components
-const StatCard = ({ title, value, icon, change = null, isPercentage = false, isCurrency = false }) => {
+const StatCard = ({ title, value, icon, isPercentage = false, isCurrency = false }) => {
   return (
     <Card className="h-full">
       <CardContent className="p-6">
@@ -18,17 +18,8 @@ const StatCard = ({ title, value, icon, change = null, isPercentage = false, isC
             <p className="text-2xl font-bold mt-1">
               {isCurrency ? formatCurrency(value) : isPercentage ? formatPercentage(value) : value}
             </p>
-            {change !== null && (
-              <div className={`flex items-center mt-1 text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {change >= 0 ? 
-                  <ArrowUpRight className="h-3 w-3 mr-1" /> : 
-                  <ArrowDownRight className="h-3 w-3 mr-1" />
-                }
-                <span>{Math.abs(change)}% em relação ao período anterior</span>
-              </div>
-            )}
           </div>
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             {icon}
           </div>
         </div>
@@ -39,16 +30,24 @@ const StatCard = ({ title, value, icon, change = null, isPercentage = false, isC
 
 const BetResultsCard = ({ bets }: { bets: Bet[] }) => {
   // Filter out pending bets
-  const completedBets = bets.filter(bet => bet.result !== 'pending');
-  const wins = completedBets.filter(bet => bet.result === 'win').length;
-  const losses = completedBets.filter(bet => bet.result === 'loss').length;
+  const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+  const wins = completedBets.filter(bet => bet.resultado === 'GREEN').length;
+  const losses = completedBets.filter(bet => bet.resultado === 'RED').length;
+  const pending = bets.filter(bet => bet.resultado === 'PENDING').length;
   
-  const data = [
-    { name: 'Ganhos', value: wins },
-    { name: 'Perdas', value: losses }
+  const totalStake = completedBets.reduce((sum, bet) => sum + bet.stake_valor, 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+  
+  const winRate = completedBets.length > 0
+    ? (wins / completedBets.length) * 100
+    : 0;
+
+  const pieData = [
+    { name: 'Vitórias', value: wins },
+    { name: 'Derrotas', value: losses }
   ];
-  
-  const COLORS = ['#28A745', '#DC3545'];
+
+  const COLORS = ['#22c55e', '#ef4444'];
   
   return (
     <Card className="h-full">
@@ -60,25 +59,19 @@ const BetResultsCard = ({ bets }: { bets: Bet[] }) => {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={data}
+                data={pieData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
+                labelLine={false}
                 outerRadius={80}
                 fill="#8884d8"
-                paddingAngle={5}
                 dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {data.map((entry, index) => (
+                {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Legend verticalAlign="bottom" height={36} />
-              <Tooltip 
-                formatter={(value) => [`${value} apostas`, '']} 
-                labelFormatter={() => ''} 
-              />
+              <Tooltip formatter={(value) => value} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -88,56 +81,42 @@ const BetResultsCard = ({ bets }: { bets: Bet[] }) => {
 };
 
 const RecentBetsCard = ({ bets }: { bets: Bet[] }) => {
-  const recentBets = bets.slice(0, 5); // Get last 5 bets
-  
+  const recentBets = [...bets].sort((a, b) => {
+    const dateA = new Date(a.aposta_data || '');
+    const dateB = new Date(b.aposta_data || '');
+    return dateB.getTime() - dateA.getTime();
+  }).slice(0, 5);
+
   return (
-    <Card className="h-full flex flex-col">
+    <Card>
       <CardHeader>
         <CardTitle>Apostas Recentes</CardTitle>
       </CardHeader>
-      <CardContent className="flex-grow">
+      <CardContent>
         <div className="space-y-4">
-          {recentBets.map((bet) => (
-            <div key={bet.id} className="flex items-start space-x-3 p-3 rounded-md bg-gray-50">
-              <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                bet.result === 'win' ? 'bg-green-100 text-green-600' :
-                bet.result === 'loss' ? 'bg-red-100 text-red-600' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {bet.result === 'win' ? (
-                  <CheckCircle className="h-4 w-4" />
-                ) : bet.result === 'loss' ? (
-                  <XCircle className="h-4 w-4" />
-                ) : (
-                  <Clock className="h-4 w-4" />
-                )}
+          {recentBets.map((bet, index) => (
+            <div key={index} className="flex items-center justify-between py-2">
+              <div className="flex items-center space-x-4">
+                {bet.resultado === 'GREEN' ? 
+                  <CheckCircle2 className="w-5 h-5 text-green-500" /> : 
+                  <XCircle className="w-5 h-5 text-red-500" />
+                }
+                <div>
+                  <div className="font-medium">{bet.partida}</div>
+                  <div className="text-sm text-muted-foreground">{bet.mercado} • Odd {bet.odd.toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground">{new Date(bet.aposta_data || '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
+                </div>
               </div>
-              <div className="flex-grow min-w-0">
-                <div className="flex justify-between items-start">
-                  <p className="font-medium text-sm truncate">{bet.match}</p>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                    bet.result === 'win' ? 'bg-green-100 text-green-800' :
-                    bet.result === 'loss' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {bet.result === 'win' ? 'Ganho' : bet.result === 'loss' ? 'Perda' : 'Pendente'}
-                  </span>
+              <div className="text-right">
+                <div className={`font-medium ${bet.resultado === 'GREEN' ? 'text-green-500' : 'text-red-500'}`}>
+                  {bet.resultado === 'GREEN' ? 'Ganho' : 'Perda'}
                 </div>
-                <div className="flex items-center text-xs text-gray-500 mt-1">
-                  <span>{bet.market}: {bet.selection}</span>
-                  <span className="mx-1">•</span>
-                  <span>Odd {bet.odds}</span>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-xs text-gray-500">{formatDate(bet.createdAt)}</span>
-                  <span className={`text-xs font-medium ${bet.result === 'win' ? 'text-green-600' : bet.result === 'loss' ? 'text-red-600' : 'text-gray-600'}`}>
-                    {bet.result === 'win' ? '+' : bet.result === 'loss' ? '-' : ''}{formatCurrency(Math.abs(bet.profit))}
-                  </span>
+                <div className={`text-sm ${bet.lucro_perda >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {bet.lucro_perda >= 0 ? '+' : '-'}R$ {Math.abs(bet.lucro_perda).toFixed(2)}
                 </div>
               </div>
             </div>
           ))}
-          
           {recentBets.length === 0 && (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
@@ -182,8 +161,8 @@ const BalanceChart = ({ chartData }: { chartData: ChartData[] }) => {
                 width={70}
               />
               <Tooltip 
-                formatter={(value) => [formatCurrency(Number(value)), 'Saldo']} 
-                labelFormatter={(date) => formatDate(date)}
+                formatter={(value: number) => [formatCurrency(value), 'Saldo'] as [string, string]}
+                labelFormatter={(date: string) => formatDate(date)}
               />
               <Line 
                 type="monotone" 
@@ -207,25 +186,30 @@ const Dashboard = () => {
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
+  // Buscar dados iniciais
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch data simultaneously with Promise.all
-        const [statsData, betsData, chartData] = await Promise.all([
-          mockDataService.getStats(),
-          mockDataService.getBets(),
-          mockDataService.getChartData()
-        ]);
-        
-        setStats(statsData);
+        if (!isAuthenticated || !user) {
+          throw new Error('Usuário não autenticado');
+        }
+
+        const betsData = await supabaseService.getBets(user.id);
         setBets(betsData);
+
+        const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
+        const statsData = supabaseService.calculateStats(betsData, userSaldo);
+        setStats(statsData);
+
+        const chartData = supabaseService.generateChartData(betsData);
         setChartData(chartData);
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error('Error fetching bets:', error);
         toast({
-          title: "Erro ao carregar dados",
-          description: "Não foi possível carregar os dados do dashboard.",
+          title: "Erro ao carregar apostas",
+          description: "Não foi possível carregar suas apostas.",
           variant: "destructive",
         });
       } finally {
@@ -234,12 +218,50 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [toast]);
+  }, [user, isAuthenticated, toast]);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    
+    if (isAuthenticated && user) {
+      console.log('[Dashboard] Iniciando realtime para usuário:', user.id);
+      
+      unsubscribe = supabaseService.subscribeToBetsChanges(user.id, (updatedBets) => {
+        console.log('[Dashboard] Recebeu atualização de apostas:', updatedBets.length);
+        setBets(updatedBets);
+
+        const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
+        console.log('[Dashboard] Saldo do usuário:', userSaldo);
+
+        const statsData = supabaseService.calculateStats(updatedBets, userSaldo);
+        console.log('[Dashboard] Estatísticas calculadas:', statsData);
+        setStats(statsData);
+
+        const chartData = supabaseService.generateChartData(updatedBets);
+        console.log('[Dashboard] Dados do gráfico gerados');
+        setChartData(chartData);
+
+        toast({
+          title: "Dados atualizados",
+          description: "Os dados das apostas foram atualizados.",
+        });
+      });
+    } else {
+      console.log('[Dashboard] Usuário não autenticado ou sem ID');
+    }
+
+    return () => {
+      if (unsubscribe) {
+        console.log('[Dashboard] Cancelando inscrição realtime');
+        unsubscribe();
+      }
+    };
+  }, [user, isAuthenticated, toast]); // Dependência no ID do usuário para recriar a inscrição se o usuário mudar
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-betBlue"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -256,52 +278,39 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Dashboard</h2>
-        <p className="text-gray-500">Visualize o desempenho da sua banca de apostas.</p>
-      </div>
-      
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Saldo da Banca" 
-          value={stats.balance} 
-          icon={<TrendingUp className="h-5 w-5 text-primary" />} 
-          change={4.2}
-          isCurrency={true}
+    <div className="container mx-auto p-4 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Saldo"
+          value={stats.balance}
+          icon={<TrendingUp className="h-5 w-5" />}
+          isCurrency
         />
-        <StatCard 
-          title="Lucro/Prejuízo" 
-          value={stats.profitLoss} 
-          icon={<TrendingUp className="h-5 w-5 text-primary" />} 
-          change={stats.profitLoss >= 0 ? 2.1 : -2.1}
-          isCurrency={true}
+        <StatCard
+          title="ROI"
+          value={stats.roi}
+          icon={<TrendingUp className="h-5 w-5" />}
+          isPercentage
         />
-        <StatCard 
-          title="ROI" 
-          value={stats.roi} 
-          icon={<TrendingUp className="h-5 w-5 text-primary" />} 
-          change={1.5}
-          isPercentage={true}
+        <StatCard
+          title="Total de Apostas"
+          value={stats.betCount}
+          icon={<TrendingUp className="h-5 w-5" />}
         />
-        <StatCard 
-          title="Taxa de Acerto" 
-          value={stats.winRate} 
-          icon={<TrendingUp className="h-5 w-5 text-primary" />} 
-          change={0.8}
-          isPercentage={true}
+        <StatCard
+          title="Taxa de Vitórias"
+          value={stats.winRate}
+          icon={<TrendingUp className="h-5 w-5" />}
+          isPercentage
         />
       </div>
-      
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BalanceChart chartData={chartData} />
         <BetResultsCard bets={bets} />
       </div>
-      
-      {/* Recent bets */}
-      <div>
+
+      <div className="grid grid-cols-1">
         <RecentBetsCard bets={bets} />
       </div>
     </div>

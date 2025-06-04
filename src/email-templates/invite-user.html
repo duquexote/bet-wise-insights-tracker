@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Convite para o Betilha</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #eaeaea;
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      background-color: #0066ff; /* Cor azul do BetTracker */
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      font-size: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+    h1 {
+      color: #0066ff;
+      font-size: 24px;
+      margin: 0;
+    }
+    .content {
+      padding: 20px 0;
+    }
+    p {
+      margin: 15px 0;
+      font-size: 16px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #0066ff;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 500;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 20px;
+      border-top: 1px solid #eaeaea;
+      color: #888;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">BE</div>
+      <h1>Betilha</h1>
+    </div>
+    
+    <div class="content">
+      <h2>Você foi convidado!</h2>
+      <p>Olá,</p>
+      <p>Você foi convidado para criar uma conta no Betilha - sua plataforma para gerenciar e acompanhar apostas esportivas de forma inteligente.</p>
+      <p>Para aceitar o convite e criar sua conta, clique no botão abaixo:</p>
+      <p style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Aceitar convite</a>
+      </p>
+      <p>Se você não esperava este convite, por favor ignore este email.</p>
+    </div>
+    
+    <div class="footer">
+      <p>© 2025 Betilha. Todos os direitos reservados.</p>
+      <p>Este é um email automático, por favor não responda.</p>
+    </div>
+  </div>
+</body>
+</html>
