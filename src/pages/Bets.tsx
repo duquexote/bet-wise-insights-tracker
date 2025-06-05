@@ -35,6 +35,19 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -45,15 +58,96 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import supabaseService, { Bet } from "@/services/supabaseService";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import { Search, CheckCircle, XCircle, Clock, Filter, Download, Edit, Plus } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Filter, Download, Edit, Plus, Check, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+// Lista de mercados disponíveis
+const marketOptions = [
+  "Simples",
+  "Dupla",
+  "Múltipla",
+  "Resultado Final (1X2)",
+  "Dupla Hipótese",
+  "Intervalo/Final do Jogo",
+  "Resultado Exato",
+  "Resultado em Ambos os Tempos",
+  "Sem Gols (0x0)",
+  "Primeiro a Marcar",
+  "Último a Marcar",
+  "Método de Vitória",
+  "Vencer sem Sofrer Gol",
+  "Para Vencer de Virada",
+  "Total de Gols",
+  "Mais/Menos por Time",
+  "Gols nos Dois Tempos",
+  "Gols Ímpares/Par",
+  "Total por Jogador",
+  "Minuto do 1º Gol",
+  "Metade com Mais Gols",
+  "Número Exato de Gols",
+  "Ambos Marcam",
+  "Ambos Marcam em Cada Tempo",
+  "Resultado e Total de Gols",
+  "Jogador a Qualquer Momento",
+  "Jogador a Marcar 2+",
+  "Jogador/Minuto do Gol",
+  "Handicap",
+  "Handicap Asiático",
+  "Escanteios Asiáticos",
+  "Total Asiático de Gols",
+  "Handicap Intervalo",
+  "Handicap Combos",
+  "Escanteios Totais",
+  "Corrida de Cantos",
+  "Escanteios HT",
+  "Escanteios por Time",
+  "Primeiro a Bater Escanteio",
+  "Time com Mais Escanteios",
+  "Cartões Totais",
+  "Cartões por Time",
+  "Primeiro Cartão",
+  "Cartão no 1º Tempo",
+  "Jogador a Levar Cartão",
+  "Jogador a Ser Expulso",
+  "Minuto do Cartão",
+  "Faltas Cometidas",
+  "Faltas por Jogador",
+  "Primeiro a Cometer Falta",
+  "Substituições Totais",
+  "Primeira Substituição",
+  "Jogador/Marcador de Gol",
+  "Jogador/Assistência",
+  "Jogador/Chute ao Gol",
+  "Jogador/Finalizações Totais",
+  "Jogador/Faltas Cometidas",
+  "Jogador/Sofrer Falta",
+  "Jogador/Desarme",
+  "Jogador Expulso",
+  "Jogador a Levar Cartão",
+  "Jogador com Mais Finalizações",
+  "Jogador a Marcar + Levar Cartão",
+  "Jogador com Mais Impedimentos",
+  "Combinação Jogador/Resultado",
+  "Jogador a Marcar + Cartão",
+  "Jogador a Marcar + Vitória",
+  "Jogador a Marcar em Ambos os Tempos",
+  "Minuto a Minuto",
+  "Resultado + Escanteios + Cartões",
+  "Impedimentos",
+  "Posse de Bola",
+  "Chutes Fora do Gol",
+  "Gols de Cabeça/Falta/Pênalti",
+  "Para Ir aos Pênaltis",
+  "Método do Gol",
+  "Clean Sheet",
+  "Jogador com Primeira Finalização"
+];
 
 // Schema de validação para o formulário de apostas
 const betFormSchema = z.object({
@@ -128,6 +222,40 @@ const BetFormDialog = ({
     
     return () => subscription.unsubscribe();
   }, [form]);
+
+  const onSubmitForm = (values: BetFormValues) => {
+    // Calcular o lucro/perda com base no resultado
+    let lucroPerda = 0;
+    
+    if (values.resultado === 'GREEN') {
+      // Lucro = (odd - 1) * stake
+      lucroPerda = (values.odd - 1) * values.stake_valor;
+    } else if (values.resultado === 'RED') {
+      // Perda = -stake
+      lucroPerda = -values.stake_valor;
+    }
+    
+    // Atualizar o lucro/perda no formulário
+    values.lucro_perda = lucroPerda;
+    
+    // Garantir que a data seja processada corretamente
+    // Criar uma nova data no fuso horário UTC para evitar problemas de conversão
+    if (values.aposta_data) {
+      const date = new Date(values.aposta_data);
+      // Criar uma string ISO sem o componente de tempo e fuso horário
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      
+      // Substituir a data original por uma nova data UTC
+      values.aposta_data = new Date(`${year}-${month}-${day}T12:00:00Z`);
+      console.log('[BetForm] Data processada:', values.aposta_data.toISOString());
+    }
+    
+    // Enviar o formulário
+    onSubmit(values);
+    setOpen(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -225,11 +353,58 @@ const BetFormDialog = ({
               control={form.control}
               name="market"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Mercado</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Resultado Final" {...field} />
-                  </FormControl>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value
+                            ? marketOptions.find(
+                                (market) => market === field.value
+                              )
+                            : "Selecione o mercado"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Pesquisar mercado..." />
+                        <CommandEmpty>Nenhum mercado encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandList className="max-h-[300px] overflow-auto">
+                            {marketOptions.map((market) => (
+                              <CommandItem
+                                key={market}
+                                value={market}
+                                onSelect={() => {
+                                  form.setValue("market", market);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    market === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {market}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}

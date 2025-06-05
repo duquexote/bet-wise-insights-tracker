@@ -10,10 +10,7 @@ const Index = () => {
       <header className="bg-white shadow-sm py-4">
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center">
-            <div className="h-10 w-10 bg-betBlue rounded-md mr-3 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">BT</span>
-            </div>
-            <h1 className="text-2xl font-bold text-betBlue">BetTracker</h1>
+            <img src="/betilha.svg" alt="Betilha Logo" className="h-10 w-auto" />
           </div>
           <div className="space-x-4">
             <Link to="/login">
@@ -35,7 +32,7 @@ const Index = () => {
                 Gerencie suas apostas esportivas com inteligência
               </h2>
               <p className="text-xl opacity-90">
-                BetTracker é a plataforma perfeita para visualizar, analisar e acompanhar o desempenho de suas apostas esportivas.
+                Betilha é a plataforma perfeita para visualizar, analisar e acompanhar o desempenho de suas apostas esportivas.
               </p>
               <div className="flex space-x-4 pt-4">
                 <Link to="/register">
@@ -109,7 +106,7 @@ const Index = () => {
               </div>
               <h2 className="text-3xl font-bold mb-4">Integração com WhatsApp</h2>
               <p className="text-gray-600 mb-6">
-                Suas apostas registradas pelo assistente de IA no WhatsApp são sincronizadas automaticamente com o BetTracker, proporcionando uma experiência perfeita.
+                Suas apostas registradas pelo assistente de IA no WhatsApp são sincronizadas automaticamente com a Betilha, proporcionando uma experiência perfeita.
               </p>
               <div className="space-y-4">
                 <div className="flex items-start">
@@ -149,7 +146,7 @@ const Index = () => {
                   <p className="text-[10px] text-gray-500 text-right">10:31</p>
                 </div>
                 <div className="bg-white rounded-lg shadow-md p-4 max-w-[80%] ml-auto">
-                  <p className="text-sm">Ótimo! Lucro de R$ 85. Atualizado no BetTracker.</p>
+                  <p className="text-sm">Ótimo! Lucro de R$ 85. Atualizado na Betilha.</p>
                   <p className="text-[10px] text-gray-500 text-right">10:32</p>
                 </div>
               </div>
@@ -163,7 +160,7 @@ const Index = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Pronto para melhorar sua gestão de apostas?</h2>
           <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-            Junte-se ao BetTracker hoje e comece a tomar decisões mais informadas nas suas apostas.
+            Junte-se a Betilha hoje e comece a tomar decisões mais informadas nas suas apostas.
           </p>
           <Link to="/register">
             <Button size="lg" className="bg-white text-betBlue hover:bg-gray-100">
@@ -179,10 +176,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row justify-between mb-8">
             <div className="mb-6 md:mb-0">
               <div className="flex items-center mb-4">
-                <div className="h-8 w-8 bg-betBlue rounded-md mr-2 flex items-center justify-center">
-                  <span className="text-white font-bold">BT</span>
-                </div>
-                <h3 className="text-xl font-bold text-white">BetTracker</h3>
+                <img src="/betilha.svg" alt="Betilha Logo" className="h-14 w-auto" />
               </div>
               <p className="text-sm max-w-xs">
                 Sua ferramenta completa para gestão e análise de apostas esportivas.
@@ -215,7 +209,7 @@ const Index = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-6 text-sm text-center">
-            <p>&copy; {new Date().getFullYear()} BetTracker. Todos os direitos reservados.</p>
+            <p>&copy; {new Date().getFullYear()} Betilha. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

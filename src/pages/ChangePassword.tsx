@@ -95,10 +95,9 @@ const ChangePassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto h-12 w-12 bg-betBlue rounded-md mb-4 flex items-center justify-center">
-            <span className="text-white font-bold text-xl">BE</span>
+          <div className="mx-auto mb-4">
+            <img src="/betilha.svg" alt="Betilha Logo" className="h-12 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold">Betilha</CardTitle>
           <p className="text-gray-500 mt-2">Alterar Senha</p>
         </CardHeader>
         <CardContent>

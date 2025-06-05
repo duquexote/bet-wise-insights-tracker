@@ -103,7 +103,7 @@ const RecentBetsCard = ({ bets }: { bets: Bet[] }) => {
                 }
                 <div>
                   <div className="font-medium">{bet.partida}</div>
-                  <div className="text-sm text-muted-foreground">{bet.mercado} • Odd {bet.odd.toFixed(2)}</div>
+                  <div className="text-sm text-muted-foreground">{bet.market} • Odd {bet.odd.toFixed(2)}</div>
                   <div className="text-xs text-muted-foreground">{new Date(bet.aposta_data || '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
                 </div>
               </div>
@@ -220,43 +220,49 @@ const Dashboard = () => {
     fetchData();
   }, [user, isAuthenticated, toast]);
 
+  // Inscrição para atualizações em tempo real
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribeBets: (() => void) | null = null;
     
     if (isAuthenticated && user) {
-      console.log('[Dashboard] Iniciando realtime para usuário:', user.id);
+      console.log('[Dashboard] Iniciando realtime para apostas do usuário:', user.id);
       
-      unsubscribe = supabaseService.subscribeToBetsChanges(user.id, (updatedBets) => {
+      // Inscrição para atualizações de apostas
+      unsubscribeBets = supabaseService.subscribeToBetsChanges(user.id, (updatedBets) => {
         console.log('[Dashboard] Recebeu atualização de apostas:', updatedBets.length);
         setBets(updatedBets);
-
+        
+        // Recalcular estatísticas e gráfico com o saldo mais recente do usuário
         const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
-        console.log('[Dashboard] Saldo do usuário:', userSaldo);
-
+        console.log('[Dashboard] Usando saldo atual do usuário para cálculos:', userSaldo);
+        
         const statsData = supabaseService.calculateStats(updatedBets, userSaldo);
-        console.log('[Dashboard] Estatísticas calculadas:', statsData);
         setStats(statsData);
-
+        
         const chartData = supabaseService.generateChartData(updatedBets);
-        console.log('[Dashboard] Dados do gráfico gerados');
         setChartData(chartData);
-
-        toast({
-          title: "Dados atualizados",
-          description: "Os dados das apostas foram atualizados.",
-        });
       });
-    } else {
-      console.log('[Dashboard] Usuário não autenticado ou sem ID');
     }
-
+    
     return () => {
-      if (unsubscribe) {
-        console.log('[Dashboard] Cancelando inscrição realtime');
-        unsubscribe();
+      if (unsubscribeBets) {
+        console.log('[Dashboard] Cancelando inscrição realtime de apostas');
+        unsubscribeBets();
       }
     };
-  }, [user, isAuthenticated, toast]); // Dependência no ID do usuário para recriar a inscrição se o usuário mudar
+  }, [user, isAuthenticated]);
+  
+  // Efeito para atualizar as estatísticas quando o usuário (incluindo saldo_banca) mudar
+  useEffect(() => {
+    if (user && bets.length > 0) {
+      console.log('[Dashboard] Usuário atualizado, recalculando estatísticas');
+      console.log('[Dashboard] Saldo da banca atual:', user.saldo_banca);
+      
+      const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
+      const statsData = supabaseService.calculateStats(bets, userSaldo);
+      setStats(statsData);
+    }
+  }, [user, bets]);
 
   if (loading) {
     return (

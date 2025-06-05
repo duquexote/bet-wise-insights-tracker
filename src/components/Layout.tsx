@@ -29,7 +29,6 @@ const Sidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean; toggleSidebar: ()
     { path: "/dashboard", label: "Dashboard", icon: <Home className="mr-2 h-5 w-5" /> },
     { path: "/bets", label: "Minhas Apostas", icon: <FileText className="mr-2 h-5 w-5" /> },
     { path: "/analysis", label: "Análise", icon: <BarChart className="mr-2 h-5 w-5" /> },
-    { path: "/change-password", label: "Alterar Senha", icon: <Lock className="mr-2 h-5 w-5" /> },
   ];
 
   return (
@@ -38,11 +37,8 @@ const Sidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean; toggleSidebar: ()
     >
       <div className="h-full flex flex-col w-64">
         <div className="px-4 py-5 flex items-center justify-between border-b">
-          <Link to="/dashboard" className="flex items-center">
-            <div className="h-8 w-8 bg-betBlue rounded-md mr-2 flex items-center justify-center">
-              <span className="text-white font-bold">BT</span>
-            </div>
-            <h1 className="text-xl font-bold text-betBlue">BetTracker</h1>
+          <Link to="/dashboard" className="flex items-center justify-center w-full">
+            <img src="/betilha.svg" alt="Betilha Logo" className="h-8 w-auto" />
           </Link>
           <button 
             onClick={toggleSidebar} 
@@ -110,10 +106,7 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           <Menu className="h-6 w-6" />
         </button>
         <div className="md:hidden flex items-center ml-4">
-          <div className="h-8 w-8 bg-betBlue rounded-md mr-2 flex items-center justify-center">
-            <span className="text-white font-bold">BT</span>
-          </div>
-          <h1 className="text-lg font-bold text-betBlue">BetTracker</h1>
+          <img src="/betilha.svg" alt="Betilha Logo" className="h-10 w-auto" />
         </div>
         <div className="flex items-center">
           <span className="text-sm text-gray-500 mr-2">

@@ -347,6 +347,66 @@ const supabaseService = {
     }
   },
 
+  // Atualizar o saldo da banca do usuário com base em suas apostas
+  updateUserBalance: async (userId: string): Promise<boolean> => {
+    try {
+      console.log('[Supabase] Iniciando atualização do saldo da banca para o usuário:', userId);
+      
+      // Buscar todas as apostas do usuário
+      const bets = await supabaseService.getBets(userId);
+      console.log(`[Supabase] Encontradas ${bets.length} apostas para o usuário`);
+      
+      // Calcular o saldo com base nas apostas
+      let balance = 0;
+      
+      // Filtrar apostas com resultado (excluir PENDING)
+      const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+      console.log(`[Supabase] ${completedBets.length} apostas com resultado definido (GREEN/RED)`);
+      
+      // Calcular o saldo somando lucro/perda de todas as apostas
+      if (completedBets.length > 0) {
+        balance = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+        console.log('[Supabase] Detalhes do cálculo do saldo:');
+        completedBets.forEach(bet => {
+          console.log(`[Supabase] Aposta ${bet.id}: ${bet.partida} - ${bet.resultado} - Lucro/Perda: ${bet.lucro_perda}`);
+        });
+      }
+      
+      console.log('[Supabase] Novo saldo calculado:', balance);
+      
+      // Verificar o saldo atual do usuário antes de atualizar
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('saldo_banca')
+        .eq('id', userId)
+        .single();
+        
+      if (fetchError) {
+        console.error('[Supabase] Erro ao buscar saldo atual do usuário:', fetchError);
+        return false;
+      }
+      
+      console.log('[Supabase] Saldo atual do usuário no banco:', userData?.saldo_banca);
+      
+      // Atualizar o saldo do usuário no banco de dados
+      const { error } = await supabase
+        .from('users')
+        .update({ saldo_banca: balance })
+        .eq('id', userId);
+        
+      if (error) {
+        console.error('[Supabase] Erro ao atualizar saldo do usuário:', error);
+        return false;
+      }
+      
+      console.log('[Supabase] Saldo da banca atualizado com sucesso de', userData?.saldo_banca, 'para', balance);
+      return true;
+    } catch (error) {
+      console.error('[Supabase] Erro ao atualizar saldo da banca:', error);
+      return false;
+    }
+  },
+  
   // Criar uma nova aposta
   createBet: async (bet: Omit<Bet, 'id' | 'created_at'>): Promise<Bet | null> => {
     try {
@@ -360,6 +420,11 @@ const supabaseService = {
         console.error('Erro ao criar aposta:', error);
         return null;
       }
+      
+      // Atualizar o saldo da banca do usuário
+      if (data) {
+        await supabaseService.updateUserBalance(data.user_id);
+      }
 
       return data as Bet;
     } catch (error) {
@@ -371,6 +436,19 @@ const supabaseService = {
   // Atualizar uma aposta existente
   updateBet: async (id: string, bet: Partial<Omit<Bet, 'id' | 'created_at' | 'user_id'>>): Promise<Bet | null> => {
     try {
+      // Primeiro, obter a aposta atual para saber o user_id
+      const { data: currentBet, error: fetchError } = await supabase
+        .from('bets')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Erro ao buscar aposta atual:', fetchError);
+        return null;
+      }
+
+      // Atualizar a aposta
       const { data, error } = await supabase
         .from('bets')
         .update(bet)
@@ -381,6 +459,11 @@ const supabaseService = {
       if (error) {
         console.error('Erro ao atualizar aposta:', error);
         return null;
+      }
+
+      // Atualizar o saldo da banca do usuário
+      if (currentBet && data) {
+        await supabaseService.updateUserBalance(currentBet.user_id);
       }
 
       return data as Bet;
@@ -426,6 +509,9 @@ const supabaseService = {
         console.error('Supabase: Erro ao excluir aposta:', error);
         return false;
       }
+
+      // Atualizar o saldo da banca do usuário após excluir a aposta
+      await supabaseService.updateUserBalance(userId);
 
       console.log('Supabase: Aposta excluída com sucesso:', id);
       return true;
