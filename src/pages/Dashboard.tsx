@@ -188,28 +188,40 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
 
-  // Buscar dados iniciais
+  // Efeito para buscar dados iniciais
   useEffect(() => {
     const fetchData = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      setLoading(true);
       try {
-        if (!isAuthenticated || !user) {
-          throw new Error('Usuário não autenticado');
-        }
-
+        console.log('[Dashboard] Dados do usuário:', user);
+        
+        // Processar a banca inicial do usuário
+        const bancaInicial = user.banca_inicial || 100000; // Usar valor padrão de 100000 se não estiver definido
+        console.log('[Dashboard] Banca inicial do usuário (processada):', bancaInicial);
+        
+        // Buscar apostas do usuário
         const betsData = await supabaseService.getBets(user.id);
         setBets(betsData);
-
-        const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
-        const statsData = supabaseService.calculateStats(betsData, userSaldo);
+        
+        // Buscar o usuário atualizado para ter o saldo mais recente
+        const updatedUser = await supabaseService.getUserById(user.id);
+        
+        // Calcular estatísticas com o saldo mais recente
+        const userSaldo = updatedUser?.saldo_banca || user.saldo_banca;
+        const statsData = supabaseService.calculateStats(betsData, userSaldo, bancaInicial);
+        console.log('[Dashboard] Stats calculadas com saldo atualizado:', statsData);
         setStats(statsData);
-
+        
+        // Gerar dados para o gráfico
         const chartData = supabaseService.generateChartData(betsData);
         setChartData(chartData);
       } catch (error) {
-        console.error('Error fetching bets:', error);
+        console.error('[Dashboard] Erro ao buscar dados:', error);
         toast({
-          title: "Erro ao carregar apostas",
-          description: "Não foi possível carregar suas apostas.",
+          title: "Erro",
+          description: "Não foi possível carregar os dados do dashboard.",
           variant: "destructive",
         });
       } finally {
@@ -218,7 +230,7 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [user, isAuthenticated, toast]);
+  }, [isAuthenticated, user, toast]);
 
   // Inscrição para atualizações em tempo real
   useEffect(() => {
@@ -228,15 +240,21 @@ const Dashboard = () => {
       console.log('[Dashboard] Iniciando realtime para apostas do usuário:', user.id);
       
       // Inscrição para atualizações de apostas
-      unsubscribeBets = supabaseService.subscribeToBetsChanges(user.id, (updatedBets) => {
+      unsubscribeBets = supabaseService.subscribeToBetsChanges(user.id, async (updatedBets) => {
         console.log('[Dashboard] Recebeu atualização de apostas:', updatedBets.length);
         setBets(updatedBets);
         
-        // Recalcular estatísticas e gráfico com o saldo mais recente do usuário
-        const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
-        console.log('[Dashboard] Usando saldo atual do usuário para cálculos:', userSaldo);
+        // Buscar o usuário atualizado para ter o saldo mais recente
+        const updatedUser = await supabaseService.getUserById(user.id);
         
-        const statsData = supabaseService.calculateStats(updatedBets, userSaldo);
+        // Recalcular estatísticas e gráfico com o saldo mais recente do usuário
+        const userSaldo = updatedUser?.saldo_banca || user.saldo_banca;
+        const bancaInicial = updatedUser?.banca_inicial || user.banca_inicial || 100000;
+        
+        console.log('[Dashboard] Saldo atualizado do usuário:', userSaldo);
+        console.log('[Dashboard] Banca inicial para cálculos:', bancaInicial);
+        
+        const statsData = supabaseService.calculateStats(updatedBets, userSaldo, bancaInicial);
         setStats(statsData);
         
         const chartData = supabaseService.generateChartData(updatedBets);
@@ -257,9 +275,15 @@ const Dashboard = () => {
     if (user && bets.length > 0) {
       console.log('[Dashboard] Usuário atualizado, recalculando estatísticas');
       console.log('[Dashboard] Saldo da banca atual:', user.saldo_banca);
+      console.log('[Dashboard] Banca inicial do usuário:', user.banca_inicial);
       
       const userSaldo = user.saldo_banca ? parseFloat(user.saldo_banca.toString()) : undefined;
-      const statsData = supabaseService.calculateStats(bets, userSaldo);
+      // Garantir que a banca inicial seja mantida durante atualizações em tempo real
+      const bancaInicial = user.banca_inicial || 100000; // Usar valor padrão de 100000 se não estiver definido
+      
+      console.log('[Dashboard] Usando banca inicial para cálculos em tempo real:', bancaInicial);
+      
+      const statsData = supabaseService.calculateStats(bets, userSaldo, bancaInicial);
       setStats(statsData);
     }
   }, [user, bets]);
@@ -285,7 +309,16 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        {stats.initialBalance !== undefined && (
+          <div className="text-sm font-medium">
+            Banca Inicial: <span className="text-primary">{formatCurrency(stats.initialBalance)}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           title="Saldo"
           value={stats.balance}
@@ -293,15 +326,30 @@ const Dashboard = () => {
           isCurrency
         />
         <StatCard
-          title="ROI"
-          value={stats.roi}
+          title="% Lucro sobre Banca"
+          value={stats.profitPercentage || 0}
           icon={<TrendingUp className="h-5 w-5" />}
           isPercentage
         />
         <StatCard
+          title="Lucro/Prejuízo"
+          value={stats.profitLoss}
+          icon={<TrendingUp className="h-5 w-5" />}
+          isCurrency
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard
           title="Total de Apostas"
           value={stats.betCount}
           icon={<TrendingUp className="h-5 w-5" />}
+        />
+        <StatCard
+          title="ROI"
+          value={stats.roi}
+          icon={<TrendingUp className="h-5 w-5" />}
+          isPercentage
         />
         <StatCard
           title="Taxa de Vitórias"

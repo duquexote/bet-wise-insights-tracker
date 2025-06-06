@@ -274,7 +274,7 @@ const BetFormDialog = ({
                 control={form.control}
                 name="aposta_data"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="flex flex-col space-y-2">
                     <FormLabel>Data da Aposta</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -312,7 +312,7 @@ const BetFormDialog = ({
                 control={form.control}
                 name="resultado"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col space-y-2">
                     <FormLabel>Resultado</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
@@ -324,8 +324,8 @@ const BetFormDialog = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="GREEN">Vitória</SelectItem>
-                        <SelectItem value="RED">Derrota</SelectItem>
+                        <SelectItem value="GREEN">Green</SelectItem>
+                        <SelectItem value="RED">Red</SelectItem>
                         <SelectItem value="PENDING">Pendente</SelectItem>
                       </SelectContent>
                     </Select>
@@ -355,56 +355,70 @@ const BetFormDialog = ({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Mercado</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn(
-                            "w-full justify-between",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value
-                            ? marketOptions.find(
-                                (market) => market === field.value
-                              )
-                            : "Selecione o mercado"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Pesquisar mercado..." />
-                        <CommandEmpty>Nenhum mercado encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandList className="max-h-[300px] overflow-auto">
-                            {marketOptions.map((market) => (
-                              <CommandItem
-                                key={market}
-                                value={market}
-                                onSelect={() => {
-                                  form.setValue("market", market);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    market === field.value
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {market}
-                              </CommandItem>
-                            ))}
-                          </CommandList>
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <div className="relative">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? field.value // Mostrar o valor real digitado pelo usuário
+                              : "Selecione ou digite um mercado"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Pesquisar ou digitar novo mercado..." 
+                            onValueChange={(value) => {
+                              // Permite ao usuário definir um valor personalizado
+                              if (value.trim() !== "") {
+                                form.setValue("market", value);
+                              }
+                            }}
+                          />
+                          <CommandEmpty>
+                            <div className="p-2 text-sm">
+                              <p>Nenhum mercado encontrado.</p>
+                              <p className="text-muted-foreground">Pressione Enter para usar o texto digitado como mercado personalizado.</p>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandList className="max-h-[300px] overflow-auto">
+                              {marketOptions.map((market) => (
+                                <CommandItem
+                                  key={market}
+                                  value={market}
+                                  onSelect={() => {
+                                    form.setValue("market", market);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      market === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {market}
+                                </CommandItem>
+                              ))}
+                            </CommandList>
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

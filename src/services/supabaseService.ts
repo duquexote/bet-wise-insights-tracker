@@ -8,6 +8,7 @@ export interface User {
   nome?: string;
   external_id?: string;
   saldo_banca?: number;
+  banca_inicial?: number;
 }
 
 export interface Bet {
@@ -32,6 +33,8 @@ export interface DashboardStats {
   winRate: number;
   averageStake: number;
   averageOdds: number;
+  initialBalance?: number;
+  profitPercentage?: number;
 }
 
 export interface ChartData {
@@ -133,6 +136,7 @@ const supabaseService = {
         phone: userData.external_id,
         nome: userData.nome,
         saldo_banca: userData.saldo_banca,
+        banca_inicial: userData.banca_inicial,
         external_id: userData.external_id
       };
     } catch (error) {
@@ -252,7 +256,9 @@ const supabaseService = {
   },
 
   // Calcular estatísticas com base nas apostas e no usuário
-  calculateStats: (bets: Bet[], userSaldo?: number): DashboardStats => {
+  calculateStats: (bets: Bet[], userSaldo?: number, userSaldoInicial?: number | string): DashboardStats => {
+    console.log('[calculateStats] Parâmetros recebidos:', { userSaldo, userSaldoInicial, betsLength: bets.length });
+    
     const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
     const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN');
     
@@ -266,6 +272,34 @@ const supabaseService = {
       ? parseFloat(((totalProfit / totalStake) * 100).toFixed(2)) 
       : 0;
     
+    // Calcular a porcentagem de lucro sobre a banca inicial
+    // Tratamento robusto para garantir que o valor seja convertido corretamente
+    let bancaInicial = 0;
+    if (userSaldoInicial !== undefined && userSaldoInicial !== null) {
+      // Converter para string primeiro para garantir que podemos usar parseFloat
+      const bancaInicialStr = String(userSaldoInicial).replace(/,/g, '.');
+      bancaInicial = parseFloat(bancaInicialStr) || 0;
+      
+      // Se o valor for NaN ou muito pequeno, verificar se é um problema de formato
+      if (isNaN(bancaInicial) || bancaInicial < 1) {
+        console.warn('[calculateStats] Possível problema com formato da banca inicial:', userSaldoInicial);
+        // Tentar extrair números da string se for um formato estranho
+        const matches = String(userSaldoInicial).match(/\d+/g);
+        if (matches && matches.length > 0) {
+          bancaInicial = parseFloat(matches.join(''));
+        }
+      }
+    }
+    
+    console.log('[calculateStats] Banca inicial processada:', bancaInicial);
+    
+    const initialBalance = bancaInicial;
+    const profitPercentage = initialBalance > 0 
+      ? parseFloat(((totalProfit / initialBalance) * 100).toFixed(2))
+      : 0;
+      
+    console.log('[calculateStats] Porcentagem de lucro calculada:', profitPercentage);
+    
     return {
       balance,
       roi,
@@ -273,7 +307,9 @@ const supabaseService = {
       betCount: bets.length,
       winRate: parseFloat(((winningBets.length / completedBets.length) * 100 || 0).toFixed(2)),
       averageStake: parseFloat((totalStake / completedBets.length || 0).toFixed(2)),
-      averageOdds: parseFloat((completedBets.reduce((sum, bet) => sum + bet.odd, 0) / completedBets.length || 0).toFixed(2))
+      averageOdds: parseFloat((completedBets.reduce((sum, bet) => sum + bet.odd, 0) / completedBets.length || 0).toFixed(2)),
+      initialBalance,
+      profitPercentage
     };
   },
 
@@ -342,7 +378,31 @@ const supabaseService = {
 
       return data as Bet;
     } catch (error) {
-      console.error('Erro ao buscar aposta:', error);
+      console.error('[Supabase] Erro inesperado ao buscar usuário:', error);
+      return null;
+    }
+  },
+  
+  // Buscar dados do usuário por ID
+  getUserById: async (userId: string): Promise<User | null> => {
+    try {
+      console.log('[Supabase] Buscando dados do usuário:', userId);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('[Supabase] Erro ao buscar usuário:', error);
+        return null;
+      }
+      
+      console.log('[Supabase] Dados do usuário encontrados:', data);
+      return data as User;
+    } catch (error) {
+      console.error('[Supabase] Erro inesperado ao buscar usuário:', error);
       return null;
     }
   },
@@ -356,42 +416,44 @@ const supabaseService = {
       const bets = await supabaseService.getBets(userId);
       console.log(`[Supabase] Encontradas ${bets.length} apostas para o usuário`);
       
-      // Calcular o saldo com base nas apostas
-      let balance = 0;
+      // Buscar dados do usuário, incluindo a banca inicial
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('banca_inicial')
+        .eq('id', userId)
+        .single();
+        
+      if (fetchError) {
+        console.error('[Supabase] Erro ao buscar dados do usuário:', fetchError);
+        return false;
+      }
+      
+      // Obter a banca inicial do usuário (valor padrão de 100000 se não estiver definido)
+      const bancaInicial = userData?.banca_inicial || 100000;
+      console.log('[Supabase] Banca inicial do usuário:', bancaInicial);
       
       // Filtrar apostas com resultado (excluir PENDING)
       const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
       console.log(`[Supabase] ${completedBets.length} apostas com resultado definido (GREEN/RED)`);
       
-      // Calcular o saldo somando lucro/perda de todas as apostas
+      // Calcular o lucro/perda total de todas as apostas
+      let totalLucroPerda = 0;
       if (completedBets.length > 0) {
-        balance = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
-        console.log('[Supabase] Detalhes do cálculo do saldo:');
+        totalLucroPerda = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+        console.log('[Supabase] Detalhes do cálculo do lucro/perda:');
         completedBets.forEach(bet => {
           console.log(`[Supabase] Aposta ${bet.id}: ${bet.partida} - ${bet.resultado} - Lucro/Perda: ${bet.lucro_perda}`);
         });
       }
       
-      console.log('[Supabase] Novo saldo calculado:', balance);
-      
-      // Verificar o saldo atual do usuário antes de atualizar
-      const { data: userData, error: fetchError } = await supabase
-        .from('users')
-        .select('saldo_banca')
-        .eq('id', userId)
-        .single();
-        
-      if (fetchError) {
-        console.error('[Supabase] Erro ao buscar saldo atual do usuário:', fetchError);
-        return false;
-      }
-      
-      console.log('[Supabase] Saldo atual do usuário no banco:', userData?.saldo_banca);
+      // Calcular o novo saldo: banca inicial + lucro/perda total
+      const novoSaldo = bancaInicial + totalLucroPerda;
+      console.log('[Supabase] Cálculo do novo saldo: Banca inicial', bancaInicial, '+ Lucro/Perda total', totalLucroPerda, '=', novoSaldo);
       
       // Atualizar o saldo do usuário no banco de dados
       const { error } = await supabase
         .from('users')
-        .update({ saldo_banca: balance })
+        .update({ saldo_banca: novoSaldo })
         .eq('id', userId);
         
       if (error) {
@@ -399,7 +461,7 @@ const supabaseService = {
         return false;
       }
       
-      console.log('[Supabase] Saldo da banca atualizado com sucesso de', userData?.saldo_banca, 'para', balance);
+      console.log('[Supabase] Saldo da banca atualizado com sucesso para', novoSaldo);
       return true;
     } catch (error) {
       console.error('[Supabase] Erro ao atualizar saldo da banca:', error);
@@ -547,8 +609,10 @@ const supabaseService = {
               email: data.email,
               phone: data.external_id,
               nome: data.nome,
-              saldo_banca: data.saldo_banca
+              saldo_banca: data.saldo_banca,
+              banca_inicial: data.banca_inicial
             };
+            console.log('[subscribeToUserChanges] Usuário atualizado com banca_inicial:', user.banca_inicial);
             callback(user);
           }
         }

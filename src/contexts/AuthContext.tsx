@@ -56,6 +56,15 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Inscrever-se para atualizações em tempo real do usuário
       unsubscribe = supabaseService.subscribeToUserChanges(user.id, (updatedUser) => {
         console.log('Usuário atualizado via real-time:', updatedUser);
+        console.log('Banca inicial antes da atualização:', user.banca_inicial);
+        console.log('Banca inicial recebida na atualização:', updatedUser.banca_inicial);
+        
+        // Preservar a banca inicial se ela vier undefined ou null na atualização
+        if (updatedUser.banca_inicial === undefined || updatedUser.banca_inicial === null) {
+          console.log('Preservando banca inicial anterior:', user.banca_inicial);
+          updatedUser.banca_inicial = user.banca_inicial || 100000;
+        }
+        
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
       });
