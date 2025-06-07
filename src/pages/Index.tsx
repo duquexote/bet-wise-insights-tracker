@@ -16,7 +16,7 @@ const Index = () => {
             <img src="/betilha.svg" alt="Betilha Logo" className="h-10 w-auto" />
           </div>
           <div className="space-x-4">
-            <a href="#planos">
+            <a href="/login">
               <Button variant="outline">Entrar</Button>
             </a>
             <a href="#planos">
@@ -38,7 +38,7 @@ const Index = () => {
                 Controle sua banca, registre suas apostas com um clique no WhatsApp e otimize seus lucros com estatísticas profissionais.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
-                <Link to="/register">
+                <Link to="#planos">
                   <Button size="lg" className="bg-white text-betBlue hover:bg-gray-100 w-full sm:w-auto">
                     Assine e Comece Agora
                   </Button>
@@ -406,7 +406,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="/register" className="block">
+                <Link to="#planos" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -434,7 +434,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="/register" className="block">
+                <Link to="#planos" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -462,7 +462,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="/register" className="block">
+                <Link to="#planos" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -497,7 +497,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="/register" className="block">
+                <Link to="#planos" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -560,7 +560,7 @@ const Index = () => {
           </div>
           
           <div className="mt-8 text-center">
-            <Link to="/register">
+            <Link to="#planos">
               <Button size="lg" className="bg-betBlue hover:bg-blue-700">
                 Comece com a Betilha Agora
               </Button>
@@ -651,7 +651,7 @@ const Index = () => {
             A Betilha é a ferramenta que faltava para você ter consistência e resultado.
             Comece agora e tenha seu gerente de banca pessoal no WhatsApp.
           </p>
-          <Link to="/register">
+          <Link to="#planos">
             <Button size="lg" className="bg-white text-betBlue hover:bg-gray-100 px-8 py-6 text-lg">
               Assinar Agora e Liberar Minha IA
             </Button>
