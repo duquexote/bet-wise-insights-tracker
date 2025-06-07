@@ -16,12 +16,12 @@ const Index = () => {
             <img src="/betilha.svg" alt="Betilha Logo" className="h-10 w-auto" />
           </div>
           <div className="space-x-4">
-            <Link to="/login">
+            <a href="#planos">
               <Button variant="outline">Entrar</Button>
-            </Link>
-            <Link to="/register">
-              <Button className="bg-betBlue hover:bg-blue-700">Criar conta</Button>
-            </Link>
+            </a>
+            <a href="#planos">
+              <Button className="bg-betBlue hover:bg-blue-700">Conhecer Planos</Button>
+            </a>
           </div>
         </div>
       </header>
@@ -349,11 +349,11 @@ const Index = () => {
                 </div>
               </div>
               <div className="mt-8">
-                <Link to="/register">
+                <a href="#planos">
                   <Button className="bg-green-600 hover:bg-green-700 text-white">
                     Quero ter essa IA agora
                   </Button>
-                </Link>
+                </a>
               </div>
             </div>
             <div className="flex justify-center">
@@ -383,7 +383,7 @@ const Index = () => {
       </section>
 
       {/* Planos e Preços */}
-      <section className="py-16 bg-white">
+      <section id="planos" className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-8">Escolha o seu plano e comece hoje mesmo:</h2>
           
