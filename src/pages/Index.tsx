@@ -406,7 +406,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="#planos" className="block">
+                <Link to="https://pay.cakto.com.br/9vi55f9" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -434,7 +434,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="#planos" className="block">
+                <Link to="https://pay.cakto.com.br/wbsxgq5" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -462,7 +462,7 @@ const Index = () => {
                   </li>
                 </ul>
                 
-                <Link to="#planos" className="block">
+                <Link to="https://pay.cakto.com.br/3khphcj" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
@@ -491,13 +491,9 @@ const Index = () => {
                     <Check className="h-4 w-4 text-green-500 mr-2" />
                     <span className="text-sm">Economia de 30%</span>
                   </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 text-green-500 mr-2" />
-                    <span className="text-sm font-semibold">Relatórios premium</span>
-                  </li>
                 </ul>
                 
-                <Link to="#planos" className="block">
+                <Link to="https://pay.cakto.com.br/t4ugoa7" className="block">
                   <Button className="w-full bg-betBlue hover:bg-blue-700">Assinar</Button>
                 </Link>
               </div>
