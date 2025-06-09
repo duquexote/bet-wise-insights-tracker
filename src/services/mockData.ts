@@ -100,7 +100,7 @@ const generateMockBets = (count: number): Bet[] => {
       // Campos compatíveis com o Supabase
       created_at: date.toISOString(),
       partida: matchName,
-      resultado: result === 'win' ? 'GREEN' : result === 'loss' ? 'RED' : 'PENDING',
+      resultado: result === 'win' ? 'GREEN' : result === 'loss' ? 'RED' : 'VOID',
       lucro_perda: profit,
       odd: odds,
       stake_valor: stake,

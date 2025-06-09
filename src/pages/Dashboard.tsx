@@ -30,13 +30,13 @@ const StatCard = ({ title, value, icon, isPercentage = false, isCurrency = false
 
 const BetResultsCard = ({ bets }: { bets: Bet[] }) => {
   // Filter out pending bets
-  const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+  const completedBets = bets.filter(bet => bet.resultado !== 'VOID' && bet.resultado !== 'PENDING');
   const wins = completedBets.filter(bet => bet.resultado === 'GREEN').length;
   const losses = completedBets.filter(bet => bet.resultado === 'RED').length;
-  const pending = bets.filter(bet => bet.resultado === 'PENDING').length;
+  const pending = bets.filter(bet => bet.resultado === 'VOID' || bet.resultado === 'PENDING').length;
   
-  const totalStake = completedBets.reduce((sum, bet) => sum + bet.stake_valor, 0);
-  const totalProfit = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+  const totalStake = completedBets.reduce((sum, bet) => sum + parseFloat(bet.stake_valor || '0'), 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
   
   const winRate = completedBets.length > 0
     ? (wins / completedBets.length) * 100
@@ -99,20 +99,25 @@ const RecentBetsCard = ({ bets }: { bets: Bet[] }) => {
               <div className="flex items-center space-x-4">
                 {bet.resultado === 'GREEN' ? 
                   <CheckCircle2 className="w-5 h-5 text-green-500" /> : 
-                  <XCircle className="w-5 h-5 text-red-500" />
+                  bet.resultado === 'RED' ? 
+                  <XCircle className="w-5 h-5 text-red-500" /> :
+                  <Clock className="w-5 h-5 text-yellow-500" />
                 }
                 <div>
                   <div className="font-medium">{bet.partida}</div>
-                  <div className="text-sm text-muted-foreground">{bet.market} • Odd {bet.odd.toFixed(2)}</div>
+                  <div className="text-sm text-muted-foreground">{bet.market} • Odd {parseFloat(bet.odd || '0').toFixed(2)}</div>
                   <div className="text-xs text-muted-foreground">{new Date(bet.aposta_data || '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
                 </div>
               </div>
               <div className="text-right">
-                <div className={`font-medium ${bet.resultado === 'GREEN' ? 'text-green-500' : 'text-red-500'}`}>
-                  {bet.resultado === 'GREEN' ? 'Ganho' : 'Perda'}
+                <div className={`font-medium ${bet.resultado === 'GREEN' ? 'text-green-500' : bet.resultado === 'RED' ? 'text-red-500' : 'text-yellow-500'}`}>
+                  {bet.resultado === 'GREEN' ? 'Ganho' : bet.resultado === 'RED' ? 'Perda' : 'Pendente'}
                 </div>
-                <div className={`text-sm ${bet.lucro_perda >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {bet.lucro_perda >= 0 ? '+' : '-'}R$ {Math.abs(bet.lucro_perda).toFixed(2)}
+                <div className={`text-sm ${bet.resultado === 'PENDING' || bet.resultado === 'VOID' ? 'text-yellow-500' : parseFloat(bet.lucro_perda || '0') >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {bet.resultado === 'PENDING' || bet.resultado === 'VOID' ? 
+                    'Aguardando' : 
+                    `${parseFloat(bet.lucro_perda || '0') >= 0 ? '+' : '-'}R$ ${Math.abs(parseFloat(bet.lucro_perda || '0')).toFixed(2)}`
+                  }
                 </div>
               </div>
             </div>

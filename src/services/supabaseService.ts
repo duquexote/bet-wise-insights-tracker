@@ -18,10 +18,10 @@ export interface Bet {
   createdAt?: string; // Para compatibilidade com o código existente
   partida: string;
   market: string;
-  resultado: 'GREEN' | 'RED' | 'PENDING';
-  lucro_perda: number;
-  odd: number;
-  stake_valor: number;
+  resultado: 'GREEN' | 'RED' | 'VOID' | 'CASHOUT' | 'PENDING';
+  lucro_perda: string; // Armazenado como string no Supabase
+  odd: string; // Armazenado como string no Supabase
+  stake_valor: string; // Armazenado como string no Supabase
   aposta_data: string;
 }
 
@@ -259,11 +259,12 @@ const supabaseService = {
   calculateStats: (bets: Bet[], userSaldo?: number, userSaldoInicial?: number | string): DashboardStats => {
     console.log('[calculateStats] Parâmetros recebidos:', { userSaldo, userSaldoInicial, betsLength: bets.length });
     
-    const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+    const completedBets = bets.filter(bet => bet.resultado !== 'VOID');
     const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN');
     
-    const totalStake = completedBets.reduce((sum, bet) => sum + bet.stake_valor, 0);
-    const totalProfit = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+    // Converter strings para números antes de realizar operações matemáticas
+    const totalStake = completedBets.reduce((sum, bet) => sum + parseFloat(bet.stake_valor || '0'), 0);
+    const totalProfit = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
     
     // Usar o saldo da banca do usuário se disponível, caso contrário calcular com base nas apostas
     const balance = userSaldo !== undefined ? parseFloat(userSaldo.toFixed(2)) : parseFloat((totalStake + totalProfit).toFixed(2));
@@ -307,7 +308,7 @@ const supabaseService = {
       betCount: bets.length,
       winRate: parseFloat(((winningBets.length / completedBets.length) * 100 || 0).toFixed(2)),
       averageStake: parseFloat((totalStake / completedBets.length || 0).toFixed(2)),
-      averageOdds: parseFloat((completedBets.reduce((sum, bet) => sum + bet.odd, 0) / completedBets.length || 0).toFixed(2)),
+      averageOdds: parseFloat((completedBets.reduce((sum, bet) => sum + parseFloat(bet.odd || '0'), 0) / completedBets.length || 0).toFixed(2)),
       initialBalance,
       profitPercentage
     };
@@ -325,8 +326,9 @@ const supabaseService = {
     
     // Gerar pontos do gráfico
     return sortedBets.map(bet => {
-      if (bet.resultado !== 'PENDING') {
-        balance += bet.lucro_perda;
+      if (bet.resultado !== 'VOID') {
+        // Converter string para número antes de adicionar ao saldo
+        balance += parseFloat(bet.lucro_perda || '0');
       }
       
       return {
@@ -432,14 +434,15 @@ const supabaseService = {
       const bancaInicial = userData?.banca_inicial || 100000;
       console.log('[Supabase] Banca inicial do usuário:', bancaInicial);
       
-      // Filtrar apostas com resultado (excluir PENDING)
-      const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+      // Filtrar apostas com resultado (excluir VOID)
+      const completedBets = bets.filter(bet => bet.resultado !== 'VOID');
       console.log(`[Supabase] ${completedBets.length} apostas com resultado definido (GREEN/RED)`);
       
       // Calcular o lucro/perda total de todas as apostas
       let totalLucroPerda = 0;
       if (completedBets.length > 0) {
-        totalLucroPerda = completedBets.reduce((sum, bet) => sum + bet.lucro_perda, 0);
+        // Converter strings para números antes de somar
+        totalLucroPerda = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
         console.log('[Supabase] Detalhes do cálculo do lucro/perda:');
         completedBets.forEach(bet => {
           console.log(`[Supabase] Aposta ${bet.id}: ${bet.partida} - ${bet.resultado} - Lucro/Perda: ${bet.lucro_perda}`);
@@ -472,6 +475,8 @@ const supabaseService = {
   // Criar uma nova aposta
   createBet: async (bet: Omit<Bet, 'id' | 'created_at'>): Promise<Bet | null> => {
     try {
+      console.log('Criando nova aposta:', bet);
+      
       const { data, error } = await supabase
         .from('bets')
         .insert([bet])
@@ -479,12 +484,20 @@ const supabaseService = {
         .single();
 
       if (error) {
-        console.error('Erro ao criar aposta:', error);
+        console.error('Erro ao criar aposta - detalhes completos:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          error: error
+        });
         return null;
       }
       
-      // Atualizar o saldo da banca do usuário
-      if (data) {
+      console.log('Aposta criada com sucesso:', data);
+      
+      // Atualizar o saldo da banca do usuário apenas se o resultado não for VOID
+      if (data && data.resultado !== 'VOID') {
         await supabaseService.updateUserBalance(data.user_id);
       }
 
@@ -498,6 +511,8 @@ const supabaseService = {
   // Atualizar uma aposta existente
   updateBet: async (id: string, bet: Partial<Omit<Bet, 'id' | 'created_at' | 'user_id'>>): Promise<Bet | null> => {
     try {
+      console.log('Atualizando aposta com ID:', id, 'Dados:', bet);
+      
       // Primeiro, obter a aposta atual para saber o user_id
       const { data: currentBet, error: fetchError } = await supabase
         .from('bets')
@@ -522,9 +537,11 @@ const supabaseService = {
         console.error('Erro ao atualizar aposta:', error);
         return null;
       }
+      
+      console.log('Aposta atualizada com sucesso:', data);
 
-      // Atualizar o saldo da banca do usuário
-      if (currentBet && data) {
+      // Atualizar o saldo da banca do usuário apenas se o resultado não for VOID
+      if (currentBet && data && data.resultado !== 'VOID') {
         await supabaseService.updateUserBalance(currentBet.user_id);
       }
 

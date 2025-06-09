@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -34,22 +33,26 @@ import {
 const PerformanceByMarketCard = ({ bets }: { bets: Bet[] }) => {
   // Group by market
   const marketPerformance = bets.reduce<Record<string, { wins: number; losses: number; profit: number; count: number; winRate: number }>>((acc, bet) => {
-    if (bet.resultado === 'PENDING') return acc;
+    if (bet.resultado === 'VOID') return acc;
     
     if (!acc[bet.market]) {
       acc[bet.market] = { wins: 0, losses: 0, profit: 0, count: 0, winRate: 0 };
     }
     
     acc[bet.market].count++;
-    acc[bet.market].profit += bet.lucro_perda;
+    acc[bet.market].profit += parseFloat(bet.lucro_perda || '0');
     
     if (bet.resultado === 'GREEN') {
       acc[bet.market].wins++;
-    } else {
+    } else if (bet.resultado === 'RED') {
       acc[bet.market].losses++;
     }
     
-    acc[bet.market].winRate = (acc[bet.market].wins / acc[bet.market].count) * 100;
+    // Calcular a taxa de acerto apenas para apostas finalizadas (GREEN ou RED)
+    const finishedBets = acc[bet.market].wins + acc[bet.market].losses;
+    if (finishedBets > 0) {
+      acc[bet.market].winRate = (acc[bet.market].wins / finishedBets) * 100;
+    }
     
     return acc;
   }, {});
@@ -136,13 +139,14 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   };
   
   bets.forEach(bet => {
-    if (bet.resultado === 'PENDING') return;
+    if (bet.resultado === 'VOID') return;
     
     let range = '';
-    if (bet.odd <= 1.5) range = '1.01-1.50';
-    else if (bet.odd <= 2.0) range = '1.51-2.00';
-    else if (bet.odd <= 2.5) range = '2.01-2.50';
-    else if (bet.odd <= 3.0) range = '2.51-3.00';
+    const oddValue = parseFloat(bet.odd || '0');
+    if (oddValue <= 1.5) range = '1.01-1.50';
+    else if (oddValue <= 2.0) range = '1.51-2.00';
+    else if (oddValue <= 2.5) range = '2.01-2.50';
+    else if (oddValue <= 3.0) range = '2.51-3.00';
     else range = '3.01+';
     
     oddsRanges[range].count++;
@@ -237,10 +241,10 @@ const MarketAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   const losses = filteredBets.filter(bet => bet.resultado === 'RED').length;
   const winProfit = filteredBets
     .filter(bet => bet.resultado === 'GREEN')
-    .reduce((sum, bet) => sum + bet.lucro_perda, 0);
+    .reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
   const lossAmount = Math.abs(filteredBets
     .filter(bet => bet.resultado === 'RED')
-    .reduce((sum, bet) => sum + bet.lucro_perda, 0));
+    .reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0));
   
   // Prepare data for pie chart
   const pieData = [
@@ -311,17 +315,18 @@ const StakeAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   };
   
   bets.forEach(bet => {
-    if (bet.resultado === 'PENDING') return;
+    if (bet.resultado === 'VOID') return;
     
     let range = '';
-    if (bet.stake_valor <= 25) range = '0-25';
-    else if (bet.stake_valor <= 50) range = '26-50';
-    else if (bet.stake_valor <= 100) range = '51-100';
+    const stakeValue = parseFloat(bet.stake_valor || '0');
+    if (stakeValue <= 25) range = '0-25';
+    else if (stakeValue <= 50) range = '26-50';
+    else if (stakeValue <= 100) range = '51-100';
     else range = '101+';
     
     stakeRanges[range].count++;
-    stakeRanges[range].profit += bet.lucro_perda;
-    stakeRanges[range].totalStake += bet.stake_valor;
+    stakeRanges[range].profit += parseFloat(bet.lucro_perda || '0');
+    stakeRanges[range].totalStake += parseFloat(bet.stake_valor || '0');
   });
   
   // Calculate ROI
@@ -453,9 +458,9 @@ const Analysis = () => {
   });
 
   // Overall stats for the selected period
-  const completedBets = filteredBets.filter(bet => bet.resultado !== 'PENDING');
-  const totalStake = completedBets.reduce((sum, bet) => sum + (bet.stake_valor || 0), 0);
-  const totalProfit = completedBets.reduce((sum, bet) => sum + (bet.lucro_perda || 0), 0);
+  const completedBets = filteredBets.filter(bet => bet.resultado !== 'VOID');
+  const totalStake = completedBets.reduce((sum, bet) => sum + parseFloat(bet.stake_valor || '0'), 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
   const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN').length;
   const winRate = completedBets.length > 0 ? (winningBets / completedBets.length) * 100 : 0;
   const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;

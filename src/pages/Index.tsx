@@ -392,7 +392,7 @@ const Index = () => {
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-6">
                 <h3 className="text-xl font-bold mb-2">Mensal</h3>
-                <div className="text-3xl font-bold mb-1">R$ 50,00<span className="text-sm font-normal text-gray-500">/mês</span></div>
+                <div className="text-3xl font-bold mb-1">R$ 49,90<span className="text-sm font-normal text-gray-500">/mês</span></div>
                 <p className="text-gray-500 text-sm mb-6">Cobrado mensalmente</p>
                 
                 <ul className="space-y-3 mb-6">

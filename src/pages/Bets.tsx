@@ -129,7 +129,6 @@ const marketOptions = [
   "Jogador/Sofrer Falta",
   "Jogador/Desarme",
   "Jogador Expulso",
-  "Jogador a Levar Cartão",
   "Jogador com Mais Finalizações",
   "Jogador a Marcar + Levar Cartão",
   "Jogador com Mais Impedimentos",
@@ -155,7 +154,7 @@ const betFormSchema = z.object({
   market: z.string().min(2, { message: "O mercado deve ter pelo menos 2 caracteres" }),
   odd: z.coerce.number().min(1.01, { message: "A odd deve ser maior que 1.01" }),
   stake_valor: z.coerce.number().min(1, { message: "A stake deve ser maior que 1" }),
-  resultado: z.enum(["GREEN", "RED", "PENDING"]),
+  resultado: z.enum(["GREEN", "RED", "PENDING", "VOID", "CASHOUT"]),
   aposta_data: z.date({ required_error: "A data da aposta é obrigatória" }),
   lucro_perda: z.coerce.number().optional(),
 });
@@ -375,7 +374,7 @@ const BetFormDialog = ({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
+                      <PopoverContent className="w-full p-0" onWheel={(e) => e.stopPropagation()}>
                         <Command>
                           <CommandInput 
                             placeholder="Pesquisar ou digitar novo mercado..." 
@@ -393,7 +392,7 @@ const BetFormDialog = ({
                             </div>
                           </CommandEmpty>
                           <CommandGroup>
-                            <CommandList className="max-h-[300px] overflow-auto">
+                            <CommandList className="max-h-[300px] overflow-y-auto">
                               {marketOptions.map((market) => (
                                 <CommandItem
                                   key={market}
@@ -586,12 +585,12 @@ const BetsTable = ({ bets, onEdit, onDelete }: { bets: Bet[], onEdit: (bet: Bet)
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Stake</div>
-          <div className="text-sm">{formatCurrency(bet.stake_valor || 0)}</div>
+          <div className="text-sm">{formatCurrency(parseFloat(bet.stake_valor) || 0)}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Lucro/Prejuízo</div>
-          <div className={`text-sm ${bet.lucro_perda >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {formatCurrency(bet.lucro_perda || 0)}
+          <div className={`text-sm ${parseFloat(bet.lucro_perda) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {formatCurrency(parseFloat(bet.lucro_perda) || 0)}
           </div>
         </div>
       </div>
@@ -643,17 +642,19 @@ const BetsTable = ({ bets, onEdit, onDelete }: { bets: Bet[], onEdit: (bet: Bet)
                   <TableCell>{bet.partida}</TableCell>
                   <TableCell>{bet.market}</TableCell>
                   <TableCell>{bet.odd}</TableCell>
-                  <TableCell>{formatCurrency(bet.stake_valor || 0)}</TableCell>
+                  <TableCell>{formatCurrency(parseFloat(bet.stake_valor) || 0)}</TableCell>
                   <TableCell>
                     {bet.resultado === 'GREEN' ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : bet.resultado === 'RED' ? (
                       <XCircle className="h-5 w-5 text-red-500" />
-                    ) : (
+                    ) : bet.resultado === 'PENDING' || bet.resultado === 'VOID' ? (
                       <Clock className="h-5 w-5 text-yellow-500" />
+                    ) : (
+                      <Clock className="h-5 w-5 text-gray-500" />
                     )}
                   </TableCell>
-                  <TableCell>{formatCurrency(bet.lucro_perda || 0)}</TableCell>
+                  <TableCell>{formatCurrency(parseFloat(bet.lucro_perda) || 0)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" onClick={() => onEdit(bet)}>
@@ -731,13 +732,13 @@ const BetsEmptyState = ({ onAddBet }: { onAddBet: () => void }) => {
 
 const BetsSummary = ({ bets }: { bets: Bet[] }) => {
   // Calculate summary data
-  const completedBets = bets.filter(bet => bet.resultado !== 'PENDING');
+  const completedBets = bets.filter(bet => bet.resultado !== 'PENDING' && bet.resultado !== 'VOID');
   const wins = completedBets.filter(bet => bet.resultado === 'GREEN').length;
   const losses = completedBets.filter(bet => bet.resultado === 'RED').length;
-  const pending = bets.filter(bet => bet.resultado === 'PENDING').length;
+  const pending = bets.filter(bet => bet.resultado === 'PENDING' || bet.resultado === 'VOID').length;
   
-  const totalStake = bets.reduce((sum, bet) => sum + (bet.stake_valor || 0), 0);
-  const totalProfit = completedBets.reduce((sum, bet) => sum + (bet.lucro_perda || 0), 0);
+  const totalStake = bets.reduce((sum, bet) => sum + (parseFloat(bet.stake_valor) || 0), 0);
+  const totalProfit = completedBets.reduce((sum, bet) => sum + (parseFloat(bet.lucro_perda) || 0), 0);
   
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -832,12 +833,16 @@ const Bets = () => {
     
     // Apply result filter
     if (selectedResult !== 'all') {
-      const resultMap = {
-        'win': 'GREEN',
-        'loss': 'RED',
-        'pending': 'PENDING'
-      };
-      filtered = filtered.filter(bet => bet.resultado === resultMap[selectedResult]);
+      if (selectedResult === 'pending') {
+        // Filtrar apostas pendentes (PENDING ou VOID)
+        filtered = filtered.filter(bet => bet.resultado === 'PENDING' || bet.resultado === 'VOID');
+      } else {
+        const resultMap = {
+          'win': 'GREEN',
+          'loss': 'RED'
+        };
+        filtered = filtered.filter(bet => bet.resultado === resultMap[selectedResult]);
+      }
     }
     
     // Apply search term
@@ -924,7 +929,12 @@ const Bets = () => {
 
       if (editingBet) {
         // Update existing bet
-        await supabaseService.updateBet(editingBet.id, formattedValues);
+        await supabaseService.updateBet(editingBet.id, {
+          ...formattedValues,
+          lucro_perda: String(formattedValues.lucro_perda),
+          odd: String(formattedValues.odd),
+          stake_valor: String(formattedValues.stake_valor)
+        });
         toast({
           title: "Aposta atualizada",
           description: "A aposta foi atualizada com sucesso.",
@@ -937,9 +947,9 @@ const Bets = () => {
           partida: formattedValues.partida, // Garantir que campos obrigatórios estejam presentes
           market: formattedValues.market,
           resultado: formattedValues.resultado,
-          odd: formattedValues.odd,
-          stake_valor: formattedValues.stake_valor,
-          lucro_perda: formattedValues.lucro_perda
+          odd: String(formattedValues.odd),
+          stake_valor: String(formattedValues.stake_valor),
+          lucro_perda: String(formattedValues.lucro_perda)
         });
         toast({
           title: "Aposta registrada",
@@ -990,11 +1000,11 @@ const Bets = () => {
         defaultValues={editingBet ? {
           partida: editingBet.partida,
           market: editingBet.market,
-          odd: editingBet.odd,
-          stake_valor: editingBet.stake_valor,
+          odd: parseFloat(editingBet.odd),
+          stake_valor: parseFloat(editingBet.stake_valor),
           resultado: editingBet.resultado,
           aposta_data: editingBet.aposta_data ? new Date(editingBet.aposta_data) : new Date(),
-          lucro_perda: editingBet.lucro_perda,
+          lucro_perda: parseFloat(editingBet.lucro_perda),
         } : undefined}
         title={editingBet ? "Editar Aposta" : "Nova Aposta"}
         buttonText={editingBet ? "Atualizar" : "Registrar"}
