@@ -1054,10 +1054,11 @@ const Bets = () => {
       
       {/* Tabs */}
       <Tabs defaultValue="all">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="all">Todas</TabsTrigger>
           <TabsTrigger value="win">Ganhos</TabsTrigger>
           <TabsTrigger value="loss">Perdas</TabsTrigger>
+          <TabsTrigger value="pending">Pendentes</TabsTrigger>
         </TabsList>
         <TabsContent value="all">
           {filteredBets.length > 0 ? (
@@ -1076,6 +1077,13 @@ const Bets = () => {
         <TabsContent value="loss">
           {filteredBets.filter(bet => bet.resultado === 'RED').length > 0 ? (
             <BetsTable bets={filteredBets.filter(bet => bet.resultado === 'RED')} onEdit={handleEditBet} onDelete={handleDeleteBet} />
+          ) : (
+            <BetsEmptyState onAddBet={handleAddBet} />
+          )}
+        </TabsContent>
+        <TabsContent value="pending">
+          {filteredBets.filter(bet => bet.resultado === 'PENDING' || bet.resultado === 'VOID').length > 0 ? (
+            <BetsTable bets={filteredBets.filter(bet => bet.resultado === 'PENDING' || bet.resultado === 'VOID')} onEdit={handleEditBet} onDelete={handleDeleteBet} />
           ) : (
             <BetsEmptyState onAddBet={handleAddBet} />
           )}
