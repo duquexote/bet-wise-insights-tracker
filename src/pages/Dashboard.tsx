@@ -3,9 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import supabaseService, { DashboardStats, Bet, ChartData } from "@/services/supabaseService";
 import { formatCurrency, formatPercentage, formatDate } from "@/utils/formatters";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Clock, CheckCircle2, XCircle, CalendarIcon, FilterIcon } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, addDays, subMonths, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from 'date-fns/locale';
 
 // Components
 const StatCard = ({ title, value, icon, isPercentage = false, isCurrency = false }) => {
@@ -71,7 +76,7 @@ const BetResultsCard = ({ bets }: { bets: Bet[] }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => value} />
+              <RechartsTooltip formatter={(value) => value} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -165,7 +170,7 @@ const BalanceChart = ({ chartData }: { chartData: ChartData[] }) => {
                 tickFormatter={(value) => `R$${value}`}
                 width={70}
               />
-              <Tooltip 
+              <RechartsTooltip 
                 formatter={(value: number) => [formatCurrency(value), 'Saldo'] as [string, string]}
                 labelFormatter={(date: string) => formatDate(date)}
               />
@@ -188,39 +193,131 @@ const BalanceChart = ({ chartData }: { chartData: ChartData[] }) => {
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
+  const [filteredBets, setFilteredBets] = useState<Bet[]>([]); // Apostas filtradas por data
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [isFilterActive, setIsFilterActive] = useState(false);
+  const [allBets, setAllBets] = useState<Bet[]>([]);
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true); // Controle do realtime
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
 
+  // Função para aplicar filtros de data
+  const applyDateFilter = (betsData: Bet[], startDate?: Date, endDate?: Date) => {
+    if (!user) return;
+    
+    // Usar a banca inicial do usuário ou o valor padrão
+    const bancaInicial = user.banca_inicial || 100000;
+    
+    // Obter o saldo atual do usuário
+    const userSaldo = user.saldo_banca;
+    
+    console.log('[Dashboard] Aplicando filtro de data:', { startDate, endDate, bancaInicial, userSaldo });
+    
+    // Filtrar apostas pelo período selecionado, se fornecido
+    let betsToUse = [...betsData];
+    if (startDate && endDate) {
+      betsToUse = betsData.filter(bet => {
+        const betDate = new Date(bet.aposta_data || '');
+        return betDate >= startDate && betDate <= endDate;
+      });
+      console.log(`[Dashboard] Apostas filtradas: ${betsToUse.length} de ${betsData.length}`);
+      setFilteredBets(betsToUse); // Armazenar apostas filtradas
+      setBets(betsToUse); // Atualizar também o estado principal de apostas para garantir consistência
+    } else {
+      setFilteredBets(betsData); // Sem filtro, usar todas as apostas
+      setBets(betsData); // Atualizar também o estado principal
+    }
+    
+    // Calcular estatísticas com filtro de data
+    const statsData = supabaseService.calculateStats(
+      betsToUse, 
+      userSaldo, 
+      bancaInicial,
+      startDate,
+      endDate
+    );
+    console.log('[Dashboard] Estatísticas calculadas:', statsData);
+    setStats(statsData);
+    
+    // Gerar dados para o gráfico com filtro de data
+    const chartData = supabaseService.generateChartData(
+      betsToUse, 
+      bancaInicial,
+      startDate,
+      endDate
+    );
+    setChartData(chartData);
+  };
+  
+  // Função para limpar filtros
+  const clearFilters = () => {
+    setDateRange({ from: undefined, to: undefined });
+    setIsFilterActive(false);
+    // Reativar realtime quando o filtro é limpo
+    setRealtimeEnabled(true);
+    applyDateFilter(allBets);
+    setFilteredBets(allBets); // Resetar para todas as apostas
+    
+    toast({
+      title: "Filtro limpo",
+      description: "Mostrando todos os dados em tempo real"
+    });
+  };
+  
+  // Função para aplicar o filtro de data selecionado
+  const handleApplyFilter = () => {
+    if (dateRange.from) {
+      // Ajustar para início e fim do dia
+      const startDate = startOfDay(dateRange.from);
+      // Se tiver data final, usar ela, senão usar a mesma data inicial (filtro de um dia)
+      const endDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      
+      console.log('[Dashboard] Aplicando filtro:', { startDate, endDate });
+      
+      // Primeiro desativar realtime e definir estado de filtro ativo
+      setRealtimeEnabled(false);
+      setIsFilterActive(true);
+      
+      // Aplicar filtro imediatamente com os dados atuais
+      applyDateFilter(allBets, startDate, endDate);
+      
+      // Mensagem diferente se for filtro de um dia ou período
+      const message = startDate.toDateString() === endDate.toDateString() 
+        ? `Mostrando dados de ${format(startDate, 'dd/MM/yyyy')}` 
+        : `Mostrando dados de ${format(startDate, 'dd/MM/yyyy')} até ${format(endDate, 'dd/MM/yyyy')}`;
+      
+      toast({
+        title: "Filtro aplicado",
+        description: message
+      });
+    }
+  };
+  
   // Efeito para buscar dados iniciais
   useEffect(() => {
     const fetchData = async () => {
       if (!isAuthenticated || !user) return;
       
       setLoading(true);
+      
       try {
-        console.log('[Dashboard] Dados do usuário:', user);
-        
-        // Processar a banca inicial do usuário
-        const bancaInicial = user.banca_inicial || 100000; // Usar valor padrão de 100000 se não estiver definido
-        console.log('[Dashboard] Banca inicial do usuário (processada):', bancaInicial);
-        
         // Buscar apostas do usuário
-        const betsData = await supabaseService.getBets(user.id);
-        setBets(betsData);
+        const fetchedBets = await supabaseService.getBets(user.id);
+        setBets(fetchedBets);
+        setAllBets(fetchedBets);
+        setFilteredBets(fetchedBets); // Inicializar apostas filtradas com todas as apostas
         
-        // Buscar o usuário atualizado para ter o saldo mais recente
-        const updatedUser = await supabaseService.getUserById(user.id);
+        // Calcular estatísticas iniciais
+        const userSaldo = user.saldo_banca;
+        const bancaInicial = user.banca_inicial || 100000;
         
-        // Calcular estatísticas com o saldo mais recente
-        const userSaldo = updatedUser?.saldo_banca || user.saldo_banca;
-        const statsData = supabaseService.calculateStats(betsData, userSaldo, bancaInicial);
-        console.log('[Dashboard] Stats calculadas com saldo atualizado:', statsData);
+        const statsData = supabaseService.calculateStats(fetchedBets, userSaldo, bancaInicial);
         setStats(statsData);
         
-        // Gerar dados para o gráfico
-        const chartData = supabaseService.generateChartData(betsData);
+        // Gerar dados para o gráfico com a banca inicial
+        const chartData = supabaseService.generateChartData(fetchedBets, bancaInicial);
         setChartData(chartData);
       } catch (error) {
         console.error('[Dashboard] Erro ao buscar dados:', error);
@@ -241,13 +338,15 @@ const Dashboard = () => {
   useEffect(() => {
     let unsubscribeBets: (() => void) | null = null;
     
-    if (isAuthenticated && user) {
+    // Só ativa o realtime se estiver autenticado, tiver usuário e o realtime estiver habilitado
+    if (isAuthenticated && user && realtimeEnabled) {
       console.log('[Dashboard] Iniciando realtime para apostas do usuário:', user.id);
       
       // Inscrição para atualizações de apostas
       unsubscribeBets = supabaseService.subscribeToBetsChanges(user.id, async (updatedBets) => {
         console.log('[Dashboard] Recebeu atualização de apostas:', updatedBets.length);
         setBets(updatedBets);
+        setAllBets(updatedBets); // Atualiza também allBets para manter sincronizado
         
         // Buscar o usuário atualizado para ter o saldo mais recente
         const updatedUser = await supabaseService.getUserById(user.id);
@@ -259,11 +358,15 @@ const Dashboard = () => {
         console.log('[Dashboard] Saldo atualizado do usuário:', userSaldo);
         console.log('[Dashboard] Banca inicial para cálculos:', bancaInicial);
         
-        const statsData = supabaseService.calculateStats(updatedBets, userSaldo, bancaInicial);
-        setStats(statsData);
-        
-        const chartData = supabaseService.generateChartData(updatedBets);
-        setChartData(chartData);
+        // Quando o realtime está ativo, não deve haver filtro ativo
+        // Mas verificamos mesmo assim por segurança
+        if (!isFilterActive) {
+          const statsData = supabaseService.calculateStats(updatedBets, userSaldo, bancaInicial);
+          setStats(statsData);
+          
+          const chartData = supabaseService.generateChartData(updatedBets, bancaInicial);
+          setChartData(chartData);
+        }
       });
     }
     
@@ -273,12 +376,12 @@ const Dashboard = () => {
         unsubscribeBets();
       }
     };
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, realtimeEnabled]); // Adicionado realtimeEnabled como dependência
   
-  // Efeito para atualizar as estatísticas quando o usuário (incluindo saldo_banca) mudar
+  // Efeito para atualizar as estatísticas quando o usuário (incluindo saldo_banca) mudar ou quando o filtro mudar
   useEffect(() => {
-    if (user && bets.length > 0) {
-      console.log('[Dashboard] Usuário atualizado, recalculando estatísticas');
+    if (user && (bets.length > 0 || filteredBets.length > 0)) {
+      console.log('[Dashboard] Recalculando estatísticas');
       console.log('[Dashboard] Saldo da banca atual:', user.saldo_banca);
       console.log('[Dashboard] Banca inicial do usuário:', user.banca_inicial);
       
@@ -286,12 +389,35 @@ const Dashboard = () => {
       // Garantir que a banca inicial seja mantida durante atualizações em tempo real
       const bancaInicial = user.banca_inicial || 100000; // Usar valor padrão de 100000 se não estiver definido
       
-      console.log('[Dashboard] Usando banca inicial para cálculos em tempo real:', bancaInicial);
+      console.log('[Dashboard] Usando banca inicial para cálculos:', bancaInicial);
       
-      const statsData = supabaseService.calculateStats(bets, userSaldo, bancaInicial);
-      setStats(statsData);
+      // Se o filtro estiver ativo, usar as apostas filtradas
+      if (isFilterActive && dateRange.from) {
+        const startDate = startOfDay(dateRange.from);
+        const endDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+        
+        // Usar filteredBets ao invés de bets quando o filtro está ativo
+        const betsToUse = filteredBets;
+        console.log(`[Dashboard] Usando ${betsToUse.length} apostas filtradas para cálculos`);
+        
+        const statsData = supabaseService.calculateStats(betsToUse, userSaldo, bancaInicial, startDate, endDate);
+        setStats(statsData);
+        
+        // Atualizar também o chartData com o filtro
+        const chartData = supabaseService.generateChartData(betsToUse, bancaInicial, startDate, endDate);
+        setChartData(chartData);
+      } else if (!isFilterActive) {
+        // Sem filtro, usar todos os dados
+        console.log(`[Dashboard] Usando ${bets.length} apostas totais para cálculos`);
+        const statsData = supabaseService.calculateStats(bets, userSaldo, bancaInicial);
+        setStats(statsData);
+        
+        // Atualizar também o chartData sem filtro
+        const chartData = supabaseService.generateChartData(bets, bancaInicial);
+        setChartData(chartData);
+      }
     }
-  }, [user, bets]);
+  }, [user, bets, filteredBets, isFilterActive, dateRange]);
 
   if (loading) {
     return (
@@ -314,13 +440,74 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        {stats.initialBalance !== undefined && (
-          <div className="text-sm font-medium">
-            Banca Inicial: <span className="text-primary">{formatCurrency(stats.initialBalance)}</span>
+        
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+          {/* Filtro de Data */}
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {dateRange.from && dateRange.to ? (
+                    <span>
+                      {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
+                    </span>
+                  ) : (
+                    <span>Selecionar período</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    if (range) {
+                      setDateRange({
+                        from: range.from,
+                        to: range.to
+                      });
+                    } else {
+                      setDateRange({ from: undefined, to: undefined });
+                    }
+                  }}
+                  locale={ptBR}
+                  className="rounded-md border"
+                />
+                <div className="p-3 border-t flex justify-between">
+                  <Button variant="outline" size="sm" onClick={() => setDateRange({ 
+                    from: subMonths(new Date(), 1), 
+                    to: new Date() 
+                  })}>
+                    Último mês
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleApplyFilter}
+                    disabled={!dateRange.from}
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            
+            {isFilterActive && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                Limpar filtro
+              </Button>
+            )}
           </div>
-        )}
+          
+          {stats?.initialBalance !== undefined && (
+            <div className="text-sm font-medium ml-auto">
+              Banca Inicial: <span className="text-primary">{formatCurrency(stats.initialBalance)}</span>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -366,11 +553,11 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BalanceChart chartData={chartData} />
-        <BetResultsCard bets={bets} />
+        <BetResultsCard bets={isFilterActive ? filteredBets : bets} />
       </div>
 
       <div className="grid grid-cols-1">
-        <RecentBetsCard bets={bets} />
+        <RecentBetsCard bets={isFilterActive ? filteredBets : bets} />
       </div>
     </div>
   );

@@ -256,24 +256,10 @@ const supabaseService = {
   },
 
   // Calcular estatísticas com base nas apostas e no usuário
-  calculateStats: (bets: Bet[], userSaldo?: number, userSaldoInicial?: number | string): DashboardStats => {
-    console.log('[calculateStats] Parâmetros recebidos:', { userSaldo, userSaldoInicial, betsLength: bets.length });
+  calculateStats: (bets: Bet[], userSaldo?: number, userSaldoInicial?: number | string, startDate?: Date, endDate?: Date): DashboardStats => {
+    console.log('[calculateStats] Parâmetros recebidos:', { userSaldo, userSaldoInicial, betsLength: bets.length, startDate, endDate });
     
-    const completedBets = bets.filter(bet => bet.resultado !== 'VOID');
-    const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN');
-    
-    // Converter strings para números antes de realizar operações matemáticas
-    const totalStake = completedBets.reduce((sum, bet) => sum + parseFloat(bet.stake_valor || '0'), 0);
-    const totalProfit = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
-    
-    // Usar o saldo da banca do usuário se disponível, caso contrário calcular com base nas apostas
-    const balance = userSaldo !== undefined ? parseFloat(userSaldo.toFixed(2)) : parseFloat((totalStake + totalProfit).toFixed(2));
-    
-    const roi = totalStake > 0 
-      ? parseFloat(((totalProfit / totalStake) * 100).toFixed(2)) 
-      : 0;
-    
-    // Calcular a porcentagem de lucro sobre a banca inicial
+    // Calcular a banca inicial primeiro para evitar problemas de referência
     // Tratamento robusto para garantir que o valor seja convertido corretamente
     let bancaInicial = 0;
     if (userSaldoInicial !== undefined && userSaldoInicial !== null) {
@@ -293,6 +279,51 @@ const supabaseService = {
     }
     
     console.log('[calculateStats] Banca inicial processada:', bancaInicial);
+    
+    // Filtrar apostas pelo período selecionado, se fornecido
+    let filteredBets = [...bets];
+    if (startDate && endDate) {
+      filteredBets = bets.filter(bet => {
+        const betDate = new Date(bet.aposta_data || '');
+        return betDate >= startDate && betDate <= endDate;
+      });
+      console.log(`[calculateStats] Apostas filtradas por data: ${filteredBets.length} de ${bets.length}`);
+    }
+    
+    const completedBets = filteredBets.filter(bet => bet.resultado !== 'VOID');
+    const winningBets = completedBets.filter(bet => bet.resultado === 'GREEN');
+    
+    // Converter strings para números antes de realizar operações matemáticas
+    const totalStake = completedBets.reduce((sum, bet) => sum + parseFloat(bet.stake_valor || '0'), 0);
+    const totalProfit = completedBets.reduce((sum, bet) => sum + parseFloat(bet.lucro_perda || '0'), 0);
+    
+    // Calcular o saldo com base no contexto
+    let balance;
+    if (startDate && endDate) {
+      // Se tiver filtro de data, calcular o saldo com base apenas nas apostas filtradas
+      // Primeiro calculamos o lucro/perda total das apostas filtradas
+      const filteredProfit = filteredBets.reduce((sum, bet) => {
+        // Só considerar apostas com resultado (GREEN, RED)
+        if (bet.resultado === 'GREEN' || bet.resultado === 'RED') {
+          return sum + parseFloat(bet.lucro_perda || '0');
+        }
+        return sum;
+      }, 0);
+      
+      // O saldo filtrado é a banca inicial + lucro/perda das apostas filtradas
+      balance = bancaInicial + filteredProfit;
+      console.log(`[calculateStats] Saldo calculado com filtro: ${balance} (Inicial: ${bancaInicial}, Lucro filtrado: ${filteredProfit})`);
+    } else {
+      // Sem filtro, usar o saldo atual do usuário se disponível
+      balance = userSaldo !== undefined ? parseFloat(userSaldo.toFixed(2)) : parseFloat((totalStake + totalProfit).toFixed(2));
+      console.log(`[calculateStats] Saldo sem filtro: ${balance}`);
+    }
+    
+    const roi = totalStake > 0 
+      ? parseFloat(((totalProfit / totalStake) * 100).toFixed(2)) 
+      : 0;
+    
+    // Banca inicial já foi calculada acima
     
     const initialBalance = bancaInicial;
     const profitPercentage = initialBalance > 0 
@@ -314,29 +345,7 @@ const supabaseService = {
     };
   },
 
-  // Gerar dados do gráfico com base nas apostas
-  generateChartData: (bets: Bet[]): ChartData[] => {
-    // Ordenar apostas por data
-    const sortedBets = [...bets].sort((a, b) => 
-      new Date(a.aposta_data || '').getTime() - new Date(b.aposta_data || '').getTime()
-    );
-
-    // Inicializar acumulador
-    let balance = 0;
-    
-    // Gerar pontos do gráfico
-    return sortedBets.map(bet => {
-      if (bet.resultado !== 'VOID') {
-        // Converter string para número antes de adicionar ao saldo
-        balance += parseFloat(bet.lucro_perda || '0');
-      }
-      
-      return {
-        date: bet.aposta_data || '',
-        balance: parseFloat(balance.toFixed(2))
-      };
-    });
-  },
+  // Função substituída pela versão mais completa no final do arquivo
 
   // Obter estatísticas do dashboard
   getStats: async (userId: string): Promise<DashboardStats | null> => {
@@ -673,6 +682,98 @@ const supabaseService = {
       supabase.removeChannel(subscription);
     };
   },
+  
+  // Gerar dados para o gráfico de evolução da banca
+  generateChartData: (bets: Bet[], bancaInicial?: number, startDate?: Date, endDate?: Date): ChartData[] => {
+    try {
+      if (!bets || bets.length === 0) return [];
+      
+      // Filtrar apostas pelo período selecionado, se fornecido
+      let filteredBets = [...bets];
+      if (startDate && endDate) {
+        filteredBets = bets.filter(bet => {
+          const betDate = new Date(bet.aposta_data || '');
+          return betDate >= startDate && betDate <= endDate;
+        });
+        console.log(`[generateChartData] Apostas filtradas por data: ${filteredBets.length} de ${bets.length}`);
+      }
+      
+      // Ordenar apostas por data
+      const sortedBets = [...filteredBets].sort((a, b) => {
+        const dateA = new Date(a.aposta_data || '').getTime();
+        const dateB = new Date(b.aposta_data || '').getTime();
+        return dateA - dateB;
+      });
+      
+      // Usar a banca inicial fornecida ou o valor padrão
+      const initialBalance = bancaInicial || 100000; // Valor padrão
+      
+      // Criar um mapa de datas para agrupar apostas do mesmo dia
+      const dateMap = new Map<string, Bet[]>();
+      
+      // Agrupar apostas por data
+      sortedBets.forEach(bet => {
+        const date = new Date(bet.aposta_data || '');
+        const dateStr = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        
+        if (!dateMap.has(dateStr)) {
+          dateMap.set(dateStr, []);
+        }
+        
+        dateMap.get(dateStr)?.push(bet);
+      });
+      
+      // Converter o mapa em um array de datas e apostas
+      const dateEntries = Array.from(dateMap.entries());
+      
+      // Calcular o saldo acumulado para cada data
+      let cumulativeBalance = initialBalance;
+      const chartData: ChartData[] = [];
+      
+      // Adicionar o ponto inicial com a banca inicial
+      if (dateEntries.length > 0) {
+        const firstDate = dateEntries[0][0];
+        const firstDateObj = new Date(firstDate);
+        firstDateObj.setDate(firstDateObj.getDate() - 1); // Um dia antes da primeira aposta
+        
+        chartData.push({
+          date: firstDateObj.toISOString().split('T')[0],
+          balance: initialBalance
+        });
+        
+        // Calcular o saldo para cada data
+        dateEntries.forEach(([date, dateBets]) => {
+          // Somar o lucro/perda de todas as apostas do dia (apenas apostas com resultado definido)
+          const completedBets = dateBets.filter(bet => bet.resultado !== 'VOID' && bet.resultado !== 'PENDING');
+          
+          const dailyProfitLoss = completedBets.reduce((sum, bet) => {
+            return sum + parseFloat(bet.lucro_perda || '0');
+          }, 0);
+          
+          // Atualizar o saldo acumulado
+          cumulativeBalance += dailyProfitLoss;
+          
+          // Adicionar ao gráfico
+          chartData.push({
+            date,
+            balance: cumulativeBalance
+          });
+        });
+      } else {
+        // Se não houver apostas, adicionar apenas o ponto inicial
+        const today = new Date().toISOString().split('T')[0];
+        chartData.push({
+          date: today,
+          balance: initialBalance
+        });
+      }
+      
+      return chartData;
+    } catch (error) {
+      console.error('Erro ao gerar dados do gráfico:', error);
+      return [];
+    }
+  }
 };
 
 export default supabaseService;

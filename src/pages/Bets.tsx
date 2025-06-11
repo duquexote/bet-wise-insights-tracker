@@ -58,14 +58,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import supabaseService, { Bet } from "@/services/supabaseService";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import { Search, CheckCircle, XCircle, Clock, Filter, Download, Edit, Plus, Check, ChevronsUpDown } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Filter, Download, Edit, Plus, Check, ChevronsUpDown, CalendarIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, subMonths } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { ptBR } from 'date-fns/locale';
 
 // Lista de mercados disponíveis
 const marketOptions = [
@@ -796,7 +797,10 @@ const Bets = () => {
   const [selectedResult, setSelectedResult] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBet, setEditingBet] = useState<Bet | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
 
+  // ... rest of the code remains the same ...
   const { toast } = useToast();
 
   const { user, isAuthenticated } = useAuth();
@@ -845,6 +849,17 @@ const Bets = () => {
       }
     }
     
+    // Apply date filter
+    if (isDateFilterActive && dateRange.from) {
+      const startDate = startOfDay(dateRange.from);
+      const endDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      
+      filtered = filtered.filter(bet => {
+        const betDate = new Date(bet.aposta_data || '');
+        return betDate >= startDate && betDate <= endDate;
+      });
+    }
+    
     // Apply search term
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
@@ -855,7 +870,7 @@ const Bets = () => {
     }
     
     setFilteredBets(filtered);
-  }, [bets, searchTerm, selectedResult]);
+  }, [bets, searchTerm, selectedResult, dateRange, isDateFilterActive]);
 
   // Handle adding a new bet
   const handleAddBet = () => {
@@ -914,6 +929,34 @@ const Bets = () => {
     }
   };
 
+  // Handle date filter
+  const handleApplyDateFilter = () => {
+    if (dateRange.from) {
+      setIsDateFilterActive(true);
+      
+      // Mensagem diferente se for filtro de um dia ou período
+      const startDate = dateRange.from;
+      const endDate = dateRange.to || dateRange.from;
+      const message = startDate.toDateString() === endDate.toDateString() 
+        ? `Mostrando apostas de ${format(startDate, 'dd/MM/yyyy')}` 
+        : `Mostrando apostas de ${format(startDate, 'dd/MM/yyyy')} até ${format(endDate, 'dd/MM/yyyy')}`;
+      
+      toast({
+        title: "Filtro de data aplicado",
+        description: message
+      });
+    }
+  };
+  
+  const handleClearDateFilter = () => {
+    setDateRange({ from: undefined, to: undefined });
+    setIsDateFilterActive(false);
+    toast({
+      title: "Filtro de data removido",
+      description: "Mostrando todas as apostas"
+    });
+  };
+  
   // Handle form submission
   const handleFormSubmit = async (values: z.infer<typeof betFormSchema>) => {
     try {
@@ -1025,6 +1068,81 @@ const Bets = () => {
               />
             </div>
             <div className="flex gap-4">
+              {/* Date Range Filter */}
+              <div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !dateRange.from && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "dd/MM/yyyy")} -{" "}
+                            {format(dateRange.to, "dd/MM/yyyy")}
+                          </>
+                        ) : (
+                          format(dateRange.from, "dd/MM/yyyy")
+                        )
+                      ) : (
+                        <span>Filtrar por data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      locale={ptBR}
+                      defaultMonth={dateRange.from}
+                      selected={{
+                        from: dateRange.from,
+                        to: dateRange.to,
+                      }}
+                      onSelect={(selectedRange) => {
+                        if (selectedRange) {
+                          setDateRange({
+                            from: selectedRange.from,
+                            to: selectedRange.to,
+                          });
+                        }
+                      }}
+                      numberOfMonths={2}
+                    />
+                    <div className="flex items-center justify-between p-3 border-t border-border">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const lastMonth = subMonths(new Date(), 1);
+                          setDateRange({
+                            from: lastMonth,
+                            to: new Date(),
+                          });
+                        }}
+                      >
+                        Último mês
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleClearDateFilter}
+                        >
+                          Limpar
+                        </Button>
+                        <Button onClick={handleApplyDateFilter}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
               <div className="w-40">
                 <Select value={selectedResult} onValueChange={setSelectedResult}>
                   <SelectTrigger>
