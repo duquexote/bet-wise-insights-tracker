@@ -130,12 +130,11 @@ const PerformanceByMarketCard = ({ bets }: { bets: Bet[] }) => {
 
 const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
   // Group by odds range
-  const oddsRanges: Record<string, { count: number; wins: number; winRate: number }> = {
-    '1.01-1.50': { count: 0, wins: 0, winRate: 0 },
-    '1.51-2.00': { count: 0, wins: 0, winRate: 0 },
-    '2.01-2.50': { count: 0, wins: 0, winRate: 0 },
-    '2.51-3.00': { count: 0, wins: 0, winRate: 0 },
-    '3.01+': { count: 0, wins: 0, winRate: 0 },
+  const oddsRanges: Record<string, { count: number; wins: number; winRate: number; profit: number }> = {
+    '1.0-1.5': { count: 0, wins: 0, winRate: 0, profit: 0 },
+    '1.5-2.5': { count: 0, wins: 0, winRate: 0, profit: 0 },
+    '2.5-5.0': { count: 0, wins: 0, winRate: 0, profit: 0 },
+    '5.0+': { count: 0, wins: 0, winRate: 0, profit: 0 },
   };
   
   bets.forEach(bet => {
@@ -143,13 +142,15 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
     
     let range = '';
     const oddValue = parseFloat(bet.odd || '0');
-    if (oddValue <= 1.5) range = '1.01-1.50';
-    else if (oddValue <= 2.0) range = '1.51-2.00';
-    else if (oddValue <= 2.5) range = '2.01-2.50';
-    else if (oddValue <= 3.0) range = '2.51-3.00';
-    else range = '3.01+';
+    if (oddValue <= 1.5) range = '1.0-1.5';
+    else if (oddValue <= 2.5) range = '1.5-2.5';
+    else if (oddValue <= 5.0) range = '2.5-5.0';
+    else range = '5.0+';
     
     oddsRanges[range].count++;
+    // Adicionar lucro/prejuízo
+    oddsRanges[range].profit += parseFloat(bet.lucro_perda || '0');
+    
     if (bet.resultado === 'GREEN') {
       oddsRanges[range].wins++;
     }
@@ -169,6 +170,7 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
       count: stats.count,
       wins: stats.wins,
       winRate: stats.winRate,
+      profit: stats.profit,
     }))
     .filter(item => item.count > 0);
   
@@ -196,10 +198,19 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
                 tickFormatter={(value) => `${value}%`}
               />
               <Tooltip 
-                formatter={(value, name) => {
-                  if (name === "Apostas") return value;
-                  if (name === "Taxa de Acerto") return `${Number(value).toFixed(2)}%`;
-                  return value;
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-white p-3 border rounded shadow-md">
+                        <p className="font-medium">{data.range}</p>
+                        <p>Apostas: {data.count}</p>
+                        <p>Taxa de Acerto: {Number(data.winRate).toFixed(2)}%</p>
+                        <p className={data.profit >= 0 ? 'text-betGreen' : 'text-betRed'}>Lucro/Prejuízo: {formatCurrency(data.profit)}</p>
+                      </div>
+                    );
+                  }
+                  return null;
                 }}
               />
               <Legend />
@@ -213,7 +224,7 @@ const OddsAnalysisCard = ({ bets }: { bets: Bet[] }) => {
               <Bar 
                 dataKey="winRate" 
                 name="Taxa de Acerto" 
-                fill="#28A745" 
+                fill="#0d6efd" 
                 yAxisId="winRate"
                 radius={[4, 4, 0, 0]}
               />
@@ -298,101 +309,6 @@ const MarketAnalysisCard = ({ bets }: { bets: Bet[] }) => {
               />
               <Legend verticalAlign="bottom" />
             </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const StakeAnalysisCard = ({ bets }: { bets: Bet[] }) => {
-  // Calculate profit by stake ranges
-  const stakeRanges: Record<string, { count: number; profit: number; roi: number; totalStake: number }> = {
-    '0-25': { count: 0, profit: 0, roi: 0, totalStake: 0 },
-    '26-50': { count: 0, profit: 0, roi: 0, totalStake: 0 },
-    '51-100': { count: 0, profit: 0, roi: 0, totalStake: 0 },
-    '101+': { count: 0, profit: 0, roi: 0, totalStake: 0 },
-  };
-  
-  bets.forEach(bet => {
-    if (bet.resultado === 'VOID') return;
-    
-    let range = '';
-    const stakeValue = parseFloat(bet.stake_valor || '0');
-    if (stakeValue <= 25) range = '0-25';
-    else if (stakeValue <= 50) range = '26-50';
-    else if (stakeValue <= 100) range = '51-100';
-    else range = '101+';
-    
-    stakeRanges[range].count++;
-    stakeRanges[range].profit += parseFloat(bet.lucro_perda || '0');
-    stakeRanges[range].totalStake += parseFloat(bet.stake_valor || '0');
-  });
-  
-  // Calculate ROI
-  Object.keys(stakeRanges).forEach(range => {
-    if (stakeRanges[range].totalStake > 0) {
-      stakeRanges[range].roi = (stakeRanges[range].profit / stakeRanges[range].totalStake) * 100;
-    }
-  });
-  
-  // Convert to array for chart
-  const data = Object.entries(stakeRanges)
-    .map(([range, stats]) => ({
-      range,
-      profit: stats.profit,
-      roi: stats.roi,
-      count: stats.count,
-    }))
-    .filter(item => item.count > 0);
-  
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Análise de Stake</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[350px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="range" />
-              <YAxis 
-                yAxisId="profit"
-                orientation="left"
-                tickFormatter={(value) => `R$${value}`}
-              />
-              <YAxis 
-                yAxisId="roi"
-                orientation="right"
-                tickFormatter={(value) => `${value}%`}
-              />
-              <Tooltip 
-                formatter={(value, name) => {
-                  if (name === "Lucro") return formatCurrency(Number(value));
-                  if (name === "ROI") return `${Number(value).toFixed(2)}%`;
-                  return value;
-                }}
-              />
-              <Legend />
-              <Bar 
-                dataKey="profit" 
-                name="Lucro" 
-                fill="#0066CC" 
-                yAxisId="profit"
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar 
-                dataKey="roi" 
-                name="ROI" 
-                fill="#28A745" 
-                yAxisId="roi"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
@@ -540,7 +456,6 @@ const Analysis = () => {
         <PerformanceByMarketCard bets={filteredBets} />
         <OddsAnalysisCard bets={filteredBets} />
         <MarketAnalysisCard bets={filteredBets} />
-        <StakeAnalysisCard bets={filteredBets} />
       </div>
     </div>
   );
