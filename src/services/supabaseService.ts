@@ -93,6 +93,8 @@ const supabaseService = {
         phone: data.external_id,
         nome: data.nome,
         saldo_banca: data.saldo_banca,
+        banca_inicial: data.banca_inicial,
+        meta_mensal: data.meta_mensal,
         external_id: data.external_id
       };
     } catch (error) {
@@ -138,6 +140,7 @@ const supabaseService = {
         nome: userData.nome,
         saldo_banca: userData.saldo_banca,
         banca_inicial: userData.banca_inicial,
+        meta_mensal: userData.meta_mensal,
         external_id: userData.external_id
       };
     } catch (error) {
@@ -193,6 +196,7 @@ const supabaseService = {
         phone: newUserData.external_id,
         nome: newUserData.nome,
         saldo_banca: newUserData.saldo_banca,
+        meta_mensal: newUserData.meta_mensal,
         external_id: newUserData.external_id
       };
     } catch (error) {

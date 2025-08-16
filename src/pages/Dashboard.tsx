@@ -210,6 +210,11 @@ const Dashboard = () => {
     // Usar a banca inicial do usuário ou o valor padrão
     const bancaInicial = user.banca_inicial || 100000;
     
+    // Log para verificar o valor de meta_mensal e seu tipo
+    console.log('[Dashboard] Meta mensal do usuário:', user.meta_mensal);
+    console.log('[Dashboard] Tipo da meta mensal:', typeof user.meta_mensal);
+    console.log('[Dashboard] Objeto user completo:', user);
+    
     // Obter o saldo atual do usuário
     const userSaldo = user.saldo_banca;
     
@@ -539,7 +544,7 @@ const Dashboard = () => {
         />
         <StatCard
           title="Meta Mensal"
-          value={user?.meta_mensal || 1000}
+          value={user?.meta_mensal ? parseFloat(String(user.meta_mensal)) : 1000}
           icon={<TrendingUp className="h-5 w-5" />}
           isCurrency
         />

@@ -26,15 +26,6 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// Usuário de exemplo para login rápido (para modo de demonstração)
-const DEMO_USER = {
-  id: "0e46be09-9617-4fe6-b8fc-1f5dc2bf7c42",
-  email: "leobonavides@cantosrace.com.br",
-  phone: "557193616894",
-  nome: "Leo Bonavides",
-  external_id: "557193616894",
-  meta_mensal: 5000
-};
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -90,14 +81,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log("[Auth] Tentativa de login com email e senha:", { email });
       
-      // Verificar se é o usuário de demonstração
-      if (email === DEMO_USER.email && password === DEMO_USER.external_id) {
-        console.log("[Auth] Login de demonstração bem-sucedido");
-        setUser(DEMO_USER);
-        localStorage.setItem("user", JSON.stringify(DEMO_USER));
-        return true;
-      }
-      
       // Tentativa de login com o Supabase usando email e senha
       const userData = await supabaseService.loginWithPassword(email, password);
       
@@ -121,14 +104,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithPhone = async (email: string, phone: string): Promise<boolean> => {
     try {
       console.log("[Auth] Tentativa de login com telefone:", { email, phone });
-      
-      // Verificar se é o usuário de demonstração
-      if (email === DEMO_USER.email && phone === DEMO_USER.phone) {
-        console.log("[Auth] Login de demonstração bem-sucedido");
-        setUser(DEMO_USER);
-        localStorage.setItem("user", JSON.stringify(DEMO_USER));
-        return true;
-      }
       
       // Tentativa de login com o Supabase usando email e telefone
       const userData = await supabaseService.login(email, phone);
