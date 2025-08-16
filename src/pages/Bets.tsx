@@ -70,83 +70,12 @@ import { ptBR } from 'date-fns/locale';
 
 // Lista de mercados disponíveis
 const marketOptions = [
-  "Simples",
-  "Dupla",
-  "Múltipla",
-  "Resultado Final (1X2)",
-  "Dupla Hipótese",
-  "Intervalo/Final do Jogo",
-  "Resultado Exato",
-  "Resultado em Ambos os Tempos",
-  "Sem Gols (0x0)",
-  "Primeiro a Marcar",
-  "Último a Marcar",
-  "Método de Vitória",
-  "Vencer sem Sofrer Gol",
-  "Para Vencer de Virada",
-  "Total de Gols",
-  "Mais/Menos por Time",
-  "Gols nos Dois Tempos",
-  "Gols Ímpares/Par",
-  "Total por Jogador",
-  "Minuto do 1º Gol",
-  "Metade com Mais Gols",
-  "Número Exato de Gols",
-  "Ambos Marcam",
-  "Ambos Marcam em Cada Tempo",
-  "Resultado e Total de Gols",
-  "Jogador a Qualquer Momento",
-  "Jogador a Marcar 2+",
-  "Jogador/Minuto do Gol",
-  "Handicap",
-  "Handicap Asiático",
-  "Escanteios Asiáticos",
-  "Total Asiático de Gols",
-  "Handicap Intervalo",
-  "Handicap Combos",
-  "Escanteios Totais",
-  "Corrida de Cantos",
-  "Escanteios HT",
-  "Escanteios por Time",
-  "Primeiro a Bater Escanteio",
-  "Time com Mais Escanteios",
-  "Cartões Totais",
-  "Cartões por Time",
-  "Primeiro Cartão",
-  "Cartão no 1º Tempo",
-  "Jogador a Levar Cartão",
-  "Jogador a Ser Expulso",
-  "Minuto do Cartão",
-  "Faltas Cometidas",
-  "Faltas por Jogador",
-  "Primeiro a Cometer Falta",
-  "Substituições Totais",
-  "Primeira Substituição",
-  "Jogador/Marcador de Gol",
-  "Jogador/Assistência",
-  "Jogador/Chute ao Gol",
-  "Jogador/Finalizações Totais",
-  "Jogador/Faltas Cometidas",
-  "Jogador/Sofrer Falta",
-  "Jogador/Desarme",
-  "Jogador Expulso",
-  "Jogador com Mais Finalizações",
-  "Jogador a Marcar + Levar Cartão",
-  "Jogador com Mais Impedimentos",
-  "Combinação Jogador/Resultado",
-  "Jogador a Marcar + Cartão",
-  "Jogador a Marcar + Vitória",
-  "Jogador a Marcar em Ambos os Tempos",
-  "Minuto a Minuto",
-  "Resultado + Escanteios + Cartões",
-  "Impedimentos",
-  "Posse de Bola",
-  "Chutes Fora do Gol",
-  "Gols de Cabeça/Falta/Pênalti",
-  "Para Ir aos Pênaltis",
-  "Método do Gol",
-  "Clean Sheet",
-  "Jogador com Primeira Finalização"
+  "Mercado de Gols",
+  "Mercado de Especiais",
+  "Mercado de Escanteios",
+  "Mercado de Handicap",
+  "Mercado de Resultados",
+  "Personalizada"
 ];
 
 // Schema de validação para o formulário de apostas
@@ -548,20 +477,20 @@ const BetsTable = ({ bets, onEdit, onDelete }: { bets: Bet[], onEdit: (bet: Bet)
   
   // Componente de cartão para visualização móvel
   const BetCard = ({ bet }: { bet: Bet }) => (
-    <div className="bg-white rounded-lg shadow-sm border p-4 mb-4">
+    <div className="bg-white rounded-lg shadow-sm border p-3 mb-3">
       <div className="flex justify-between items-start mb-2">
-        <div>
-          <div className="font-medium">{bet.partida}</div>
-          <div className="text-sm text-muted-foreground">{formatDate(bet.aposta_data || '')}</div>
+        <div className="max-w-[75%]">
+          <div className="font-medium text-sm line-clamp-2">{bet.partida}</div>
+          <div className="text-xs text-muted-foreground">{formatDate(bet.aposta_data || '')}</div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(bet)}>
-            <Edit className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onEdit(bet)}>
+            <Edit className="h-3.5 w-3.5" />
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-red-500 hover:text-red-700"
+            className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
             onClick={() => handleDeleteClick(bet.id)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2">
@@ -575,43 +504,43 @@ const BetsTable = ({ bets, onEdit, onDelete }: { bets: Bet[], onEdit: (bet: Bet)
         </div>
       </div>
       
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 mb-2">
         <div>
           <div className="text-xs text-muted-foreground">Mercado</div>
-          <div className="text-sm truncate">{bet.market}</div>
+          <div className="text-xs font-medium truncate">{bet.market}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Odd</div>
-          <div className="text-sm">{bet.odd}</div>
+          <div className="text-xs font-medium">{bet.odd}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Stake</div>
-          <div className="text-sm">{formatCurrency(parseFloat(bet.stake_valor) || 0)}</div>
+          <div className="text-xs font-medium">{formatCurrency(parseFloat(bet.stake_valor) || 0)}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Lucro/Prejuízo</div>
-          <div className={`text-sm ${parseFloat(bet.lucro_perda) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <div className={`text-xs font-medium ${parseFloat(bet.lucro_perda) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {formatCurrency(parseFloat(bet.lucro_perda) || 0)}
           </div>
         </div>
       </div>
       
       <div className="flex items-center">
-        <div className="text-xs text-muted-foreground mr-2">Resultado:</div>
+        <div className="text-xs text-muted-foreground mr-1">Resultado:</div>
         {bet.resultado === 'GREEN' ? (
           <div className="flex items-center text-green-500">
-            <CheckCircle className="h-4 w-4 mr-1" />
-            <span className="text-sm">Ganho</span>
+            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+            <span className="text-xs font-medium">Ganho</span>
           </div>
         ) : bet.resultado === 'RED' ? (
           <div className="flex items-center text-red-500">
-            <XCircle className="h-4 w-4 mr-1" />
-            <span className="text-sm">Perda</span>
+            <XCircle className="h-3.5 w-3.5 mr-1" />
+            <span className="text-xs font-medium">Perda</span>
           </div>
         ) : (
           <div className="flex items-center text-yellow-500">
-            <Clock className="h-4 w-4 mr-1" />
-            <span className="text-sm">Pendente</span>
+            <Clock className="h-3.5 w-3.5 mr-1" />
+            <span className="text-xs font-medium">Pendente</span>
           </div>
         )}
       </div>
@@ -742,44 +671,44 @@ const BetsSummary = ({ bets }: { bets: Bet[] }) => {
   const totalProfit = completedBets.reduce((sum, bet) => sum + (parseFloat(bet.lucro_perda) || 0), 0);
   
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5 md:gap-4 mb-4 sm:mb-6">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">Total de Apostas</span>
-            <span className="text-2xl font-bold">{bets.length}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Total de Apostas</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-bold">{bets.length}</span>
           </div>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">Ganhos</span>
-            <span className="text-2xl font-bold text-betGreen">{wins}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Ganhos</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-bold text-betGreen">{wins}</span>
           </div>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">Perdas</span>
-            <span className="text-2xl font-bold text-betRed">{losses}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Perdas</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-bold text-betRed">{losses}</span>
           </div>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">Pendentes</span>
-            <span className="text-2xl font-bold text-betGray">{pending}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Pendentes</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-bold text-betGray">{pending}</span>
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardContent className="p-4">
+      <Card className="col-span-2 md:col-span-1">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">Lucro/Prejuízo</span>
-            <span className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-betGreen' : 'text-betRed'}`}>
+            <span className="text-xs sm:text-sm text-muted-foreground">Lucro/Prejuízo</span>
+            <span className={`text-lg sm:text-xl md:text-2xl font-bold ${totalProfit >= 0 ? 'text-betGreen' : 'text-betRed'}`}>
               {formatCurrency(totalProfit)}
             </span>
           </div>
@@ -1025,12 +954,12 @@ const Bets = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold mb-2">Minhas Apostas</h2>
-          <p className="text-gray-500">Visualize e analise todas as suas apostas.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Minhas Apostas</h2>
+          <p className="text-sm text-gray-500">Visualize e analise todas as suas apostas.</p>
         </div>
-        <Button onClick={handleAddBet} className="flex items-center gap-2">
+        <Button onClick={handleAddBet} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" /> Nova Aposta
         </Button>
       </div>
@@ -1056,9 +985,9 @@ const Bets = () => {
       
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
               <Input
                 placeholder="Buscar apostas..."
@@ -1067,25 +996,25 @@ const Bets = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4">
               {/* Date Range Filter */}
-              <div>
+              <div className="flex-1 min-w-[140px]">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal text-xs sm:text-sm",
                         !dateRange.from && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       {dateRange.from ? (
                         dateRange.to ? (
-                          <>
+                          <span className="truncate">
                             {format(dateRange.from, "dd/MM/yyyy")} -{" "}
                             {format(dateRange.to, "dd/MM/yyyy")}
-                          </>
+                          </span>
                         ) : (
                           format(dateRange.from, "dd/MM/yyyy")
                         )
@@ -1112,11 +1041,14 @@ const Bets = () => {
                           });
                         }
                       }}
-                      numberOfMonths={2}
+                      numberOfMonths={1}
+                      className="max-w-[300px]"
                     />
-                    <div className="flex items-center justify-between p-3 border-t border-border">
+                    <div className="flex items-center justify-between p-3 border-t border-border flex-wrap gap-2">
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="text-xs"
                         onClick={() => {
                           const lastMonth = subMonths(new Date(), 1);
                           setDateRange({
@@ -1130,11 +1062,17 @@ const Bets = () => {
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
+                          size="sm"
+                          className="text-xs"
                           onClick={handleClearDateFilter}
                         >
                           Limpar
                         </Button>
-                        <Button onClick={handleApplyDateFilter}>
+                        <Button 
+                          size="sm"
+                          className="text-xs"
+                          onClick={handleApplyDateFilter}
+                        >
                           Aplicar
                         </Button>
                       </div>
@@ -1143,9 +1081,9 @@ const Bets = () => {
                 </Popover>
               </div>
               
-              <div className="w-40">
+              <div className="flex-1 min-w-[120px]">
                 <Select value={selectedResult} onValueChange={setSelectedResult}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs sm:text-sm">
                     <SelectValue placeholder="Resultado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1156,12 +1094,14 @@ const Bets = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon">
-                <Download className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <Filter className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -1172,11 +1112,11 @@ const Bets = () => {
       
       {/* Tabs */}
       <Tabs defaultValue="all">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="win">Ganhos</TabsTrigger>
-          <TabsTrigger value="loss">Perdas</TabsTrigger>
-          <TabsTrigger value="pending">Pendentes</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 h-auto">
+          <TabsTrigger value="all" className="text-xs sm:text-sm py-1.5 sm:py-2">Todas</TabsTrigger>
+          <TabsTrigger value="win" className="text-xs sm:text-sm py-1.5 sm:py-2">Ganhos</TabsTrigger>
+          <TabsTrigger value="loss" className="text-xs sm:text-sm py-1.5 sm:py-2">Perdas</TabsTrigger>
+          <TabsTrigger value="pending" className="text-xs sm:text-sm py-1.5 sm:py-2">Pendentes</TabsTrigger>
         </TabsList>
         <TabsContent value="all">
           {filteredBets.length > 0 ? (

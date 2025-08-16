@@ -9,6 +9,7 @@ export interface User {
   external_id?: string;
   saldo_banca?: number;
   banca_inicial?: number;
+  meta_mensal?: number;
 }
 
 export interface Bet {
@@ -411,7 +412,16 @@ const supabaseService = {
       }
       
       console.log('[Supabase] Dados do usuário encontrados:', data);
-      return data as User;
+      return {
+        id: data.id,
+        email: data.email,
+        phone: data.external_id,
+        nome: data.nome,
+        saldo_banca: data.saldo_banca,
+        banca_inicial: data.banca_inicial,
+        meta_mensal: data.meta_mensal,
+        external_id: data.external_id
+      };
     } catch (error) {
       console.error('[Supabase] Erro inesperado ao buscar usuário:', error);
       return null;
@@ -636,7 +646,8 @@ const supabaseService = {
               phone: data.external_id,
               nome: data.nome,
               saldo_banca: data.saldo_banca,
-              banca_inicial: data.banca_inicial
+              banca_inicial: data.banca_inicial,
+              meta_mensal: data.meta_mensal
             };
             console.log('[subscribeToUserChanges] Usuário atualizado com banca_inicial:', user.banca_inicial);
             callback(user);

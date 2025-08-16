@@ -538,10 +538,10 @@ const Dashboard = () => {
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
-          title="ROI"
-          value={stats.roi}
+          title="Meta Mensal"
+          value={user?.meta_mensal || 1000}
           icon={<TrendingUp className="h-5 w-5" />}
-          isPercentage
+          isCurrency
         />
         <StatCard
           title="Taxa de Vitórias"

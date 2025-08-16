@@ -32,7 +32,8 @@ const DEMO_USER = {
   email: "leobonavides@cantosrace.com.br",
   phone: "557193616894",
   nome: "Leo Bonavides",
-  external_id: "557193616894"
+  external_id: "557193616894",
+  meta_mensal: 5000
 };
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
@@ -63,6 +64,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (updatedUser.banca_inicial === undefined || updatedUser.banca_inicial === null) {
           console.log('Preservando banca inicial anterior:', user.banca_inicial);
           updatedUser.banca_inicial = user.banca_inicial || 100000;
+        }
+        
+        // Preservar a meta mensal se ela vier undefined ou null na atualização
+        if (updatedUser.meta_mensal === undefined || updatedUser.meta_mensal === null) {
+          console.log('Preservando meta mensal anterior:', user.meta_mensal);
+          updatedUser.meta_mensal = user.meta_mensal || 1000;
         }
         
         setUser(updatedUser);
